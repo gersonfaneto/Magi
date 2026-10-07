@@ -1,0 +1,97 @@
+#!/usr/bin/env janet
+# A helper for common NixOS operations.
+#
+# I envy the user story for Guix's CLI; Nix's does not spark joy, in my humble
+# opinion. This script exists to abstract my more common NixOS workflows, like
+# rebuilding (nixos-rebuild), cleaning up (nix-collect-garbage), managing the
+# system profile (rollback or diffing), updating flakes, and dotfile management
+# (and then some).
+#
+# For a list of subcommands run `hey help`, or `hey help --dump` for a
+# machine-readable dump.
+#
+# SYNOPSIS:
+#   hey [-?|-??|-???|-!] [-h|--help] COMMAND [ARGS...]
+#
+# OPTIONS:
+#   -!
+#     Do a dry run. WARNING: It's up to called scripts to obey!
+#   -? | -?? | -???
+#     Enable debug (verbose) mode, at increasing verbosity.
+#   -h, --help
+#     Display the documentation embedded in a target script's header.
+
+(use hey)
+
+(import ./hey.d/gc)
+(import ./hey.d/hook)
+(import ./hey.d/info)
+(import ./hey.d/ops)
+(import ./hey.d/path)
+(import ./hey.d/profile)
+(import ./hey.d/pull)
+(import ./hey.d/reload)
+(import ./hey.d/repl)
+(import ./hey.d/swap)
+(import ./hey.d/sync)
+(import ./hey.d/test)
+(import ./hey.d/vars)
+(import ./hey.d/sup)
+(import ./hey.d/wm)
+
+# Evaluated at compile-time
+(def- *built* {:t (os/time)
+               :v "v0.1.0"
+               :f (path/abbrev (path/abspath (dyn :current-file)))
+               :jv janet/version})
+
+(defn- version [& _]
+  (let [{:year yr :month mo :month-day day :hours hr :minutes min :seconds s}
+        (os/date (*built* :t) true)]
+    (echof "hey %s (built %04d-%02d-%02d %02d:%02d:%02d) @ %s"
+           (*built* :v) yr (inc mo) (inc day) hr min s (*built* :f))
+    (echof "janet %s (%s)" janet/version janet/build)))
+
+(defn main [_ & args]
+  (dispatch [[:get :set]    {:doc "Alias for hey vars {get,set} ..."
+                             :eval |[vars/vars ;$&]}
+             :gc            gc/gc
+             :hook          hook/hook
+             :host          {:doc "Dispatch to hosts/$HOST/bin."
+                             :exec |[(path (keyword $0) "bin") ;$&]}
+             :info          info/info
+             :ops           ops/ops
+             :path          path/path
+             [:profile :pr] profile/profile
+             :pull          pull/pull
+             [:reload :re]  reload/reload
+             :repl          repl/repl
+             [:swap :sw]    swap/swap
+             [:sync :s]     sync/sync
+             :test          test/test
+             :vars          vars/vars
+             [:v :version]  {:doc "Print hey's version."
+                             :eval |[version ;$&]}
+             :sup           sup/sup
+             :wm            wm/wm
+             :exec          {:doc "Execute a program on $PATH through hey."
+                             :exec (fn [_ &opt arg & args]
+                                     [(if arg
+                                        (or (path/find arg)
+                                            (abort "%s: command not found" arg))
+                                        (abort "exec: which program?"))
+                                      ;args])}
+             '(+ "./" "/")  {:doc "Execute a script by path."
+                             :name "./"
+                             :exec |[;$&]}
+             '(* ".")       {:doc "Execute the first script found under host, wm, or bin/."
+                             :name ".*"
+                             :exec |(or (resolve [(path :host "bin")
+                                                  (ignore-errors (path :wm "bin"))
+                                                  (path :bin)]
+                                                 (slice $0 1) ;$&)
+                                        (abort "%s: command not found" $0))}
+             '(* "@")       {:doc "Dispatch to config/DIR/bin."
+                             :name "@*"
+                             :exec |[(path :config (slice $0 1) :bin) ;$&]}]
+            ;args))

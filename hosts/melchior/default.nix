@@ -1,0 +1,142 @@
+# melchior -- my ThinkPad T495 workstation
+{
+  self,
+  lib,
+  ...
+}:
+with lib;
+with builtins; {
+  system = "x86_64-linux";
+
+  imports = [
+    self.modules.nixos-hardware.lenovo-thinkpad-t495
+    self.inputs.disko.nixosModules.disko
+    ./disko.nix
+  ];
+
+  ## Flake modules
+  modules = {
+    xdg.ssh.enable = true;
+
+    profiles = {
+      role = "workstation";
+      user = "gerson";
+      networks = ["br"];
+      hardware = [
+        "cpu/amd"
+        "gpu/amd"
+        "wifi"
+        "pc/laptop"
+        "audio"
+        "ssd"
+        "bluetooth"
+      ];
+    };
+
+    wm = {
+      desktop = "hyprland";
+      theme.fonts.mono = "ProFont IIx Nerd Font Mono";
+      plymouth = {
+        enable = true;
+        seamless = true;
+      };
+      hyprland = {
+        monitors = [
+          {
+            output = "eDP-1";
+            primary = true;
+          }
+        ];
+        extraConfig = ''
+          hl.config({
+            input = {
+              kb_layout = "br",
+              kb_variant = "thinkpad",
+              kb_options = "compose:ralt",
+            }
+          })
+        '';
+      };
+    };
+
+    ai.enable = true;
+    ai.opencode.enable = true;
+
+    apps = {
+      term.default = "foot";
+      term.foot.enable = true;
+
+      flatpak.enable = true;
+      rofi.enable = true;
+      steam.enable = true;
+      thunar.enable = true;
+
+      browsers.default = "chromium";
+      browsers.chromium.enable = true;
+
+      media.graphics.enable = true;
+      media.music.enable = true;
+      media.video.enable = true;
+      media.pdf.enable = true;
+    };
+    dev = {
+      cc.enable = true;
+      lua.enable = true;
+      rust.enable = true;
+      node.enable = true;
+    };
+    editors = {
+      default = "nvim";
+      vim.enable = true;
+    };
+    shell = {
+      direnv.enable = true;
+      git.enable = true;
+      gnupg.enable = true;
+      tmux.enable = true;
+      zsh.enable = true;
+      ranger.enable = true;
+      search.enable = true;
+      pandoc.enable = true;
+    };
+    services = {
+      ssh.enable = true;
+    };
+    system = {
+      utils.enable = true;
+    };
+  };
+
+  ## Local config
+  config = {pkgs, ...}: {
+    modules.wm.theme.fonts.extraPackages = with pkgs; [nerd-fonts.profont];
+
+    console.keyMap = "br-abnt2";
+
+    services.xserver.xkb = {
+      layout = "br";
+      variant = "thinkpad";
+    };
+
+    # Tapping the power button should do nothing.
+    services.logind.settings.Login.HandlePowerKey = "ignore";
+  };
+
+  ## Hardware config
+  hardware = {...}: {
+    boot.initrd.availableKernelModules = [
+      "nvme"
+      "ehci_pci"
+      "rtsx_pci_sdmmc"
+    ];
+    boot.kernelModules = ["kvm-amd"];
+
+    # Cap the battery charge for longevity. Always plugged in anyway.
+    services.udev.extraRules = ''
+      ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="BAT*", ATTR{charge_control_end_threshold}=="?*", ATTR{charge_types}="Custom", ATTR{charge_control_end_threshold}="80"
+    '';
+
+    # fileSystems and swapDevices come from ./disko.nix (via the disko
+    # module imported above), which mirrors the live layout.
+  };
+}

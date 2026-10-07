@@ -1,0 +1,135 @@
+/** -*- mode: css -*- **/
+
+* {
+  background-color: transparent;
+  text-color: inherit;
+
+  accent:   {{ colors.primary.default.hex }};
+  bg:       {{ colors.background.default.hex }};
+  bg-alt:   {{ colors.surface_container_lowest.default.hex }};
+  bg-light: {{ colors.surface_container_high.default.hex }};
+  border:   {{ colors.surface_container.default.hex }};
+
+  fg:       {{ colors.on_surface.default.hex }};
+  fg-dim:   {{ colors.surface_container_highest.default.hex }};
+
+  selected: @bg-light;
+
+  pad1: 4px;
+  pad2: 8px;
+  pad3: 12px;
+  pad4: 16px;
+  pad5: 20px;
+  pad6: 24px;
+  pad7: 32px;
+}
+
+* { font: @font-mono-1; }
+error-message { font: @font-sans-0; }
+entry, prompt { font: @font-mono-3; }
+
+configuration {
+  show-icons: true;
+  run,drun,window {
+    fallback-icon: "checkbox-symbolic";
+  }
+}
+
+window {
+  enabled: true;
+  anchor: env(ROFI_ANCHOR, north);
+  location: north;
+  x-offset: env(ROFI_X, 0);
+  y-offset: env(ROFI_Y, 10%);
+  transparency: "real";
+  background-color: transparent;
+  width: 760px;
+  height: 100%;
+}
+
+error-message {
+  padding: @pad7;
+}
+
+listview {
+  expand: false;
+  fixed-height: false;
+}
+listview, inputbar, overlay, message, error-message {
+  background-color: @bg;
+  margin: 0 0 8px 0;
+  border: 0 0 2px 0;
+  border-color: @border;
+  border-radius: 1px;
+}
+element, overlay, error-message {
+  background-color: @bg-alt;
+}
+element selected {
+  background-color: @selected;
+}
+message {
+  background-color: @bg-light;
+  margin: -9px 0 8px 0;
+  padding: 16px 24px;
+}
+
+textbox, prompt, entry, element-text {
+  text-color: @fg;
+}
+
+
+/** Icons **/
+element-icon { size: 24px; }
+icon, icon-current-entry { size: 32px; }
+
+
+
+/** Input area **/
+inputbar {
+  /* children: [ icon, prompt, entry, num-filtered-rows ]; */
+  padding: @pad5;
+  spacing: @pad3;
+}
+prompt, entry, num-filtered-rows, element-text {
+  vertical-align: 0.65;
+}
+textbox-current-entry, prompt, num-filtered-rows {
+  text-color: @fg;
+}
+num-filtered-rows {
+  text-color: @fg-dim;
+}
+prompt {
+  enabled: false;
+  text-transform: bold;
+}
+entry {
+  blink: true;
+  placeholder: env(ROFI_PLACEHOLDER, "Search...");
+  placeholder-color: @fg-dim;
+  placeholder-markup: true;
+  cursor: text;
+}
+icon {
+  filename: env(ROFI_ICON, "system-search-symbolic");
+}
+
+/** List **/
+listview {
+  spacing: 0;
+}
+overlay {
+  text-color: @fg-dim;
+  text-transform: italic;
+}
+
+element {
+  spacing: 18px;
+  padding: 0.5em 0em 0.5em 2.5ch;
+}
+
+element-text {
+  horizontal-align: 0.0;
+  highlight: underline bold;
+}

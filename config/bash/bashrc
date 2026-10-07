@@ -1,0 +1,344 @@
+#!/usr/bin/bash
+# A bash approximation of my zsh config, intentionally designed to be
+# self-contained and minimalistic, and intended for remotes without zsh.
+#
+# Use `hey @bash infect SSHHOST` to "infect" a remote with this config.
+
+[[ $- != *i* ]] && return   # interactive only!
+
+: ${XDG_CONFIG_HOME:=$HOME/.config}
+: ${XDG_CACHE_HOME:=$HOME/.cache}
+: ${XDG_DATA_HOME:=$HOME/.local/share}
+: ${XDG_STATE_HOME:=$HOME/.local/state}
+export XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+
+
+## Helpers
+has() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+
+## Options
+shopt -s extglob            # EXTENDED_GLOB
+shopt -s globstar           # ** , which zsh has had since before I was born
+shopt -s nocaseglob         # no CASE_GLOB
+shopt -s cdable_vars        # CDABLE_VARS
+shopt -s checkwinsize       # bash, unlike zsh, needs telling
+shopt -u huponexit          # no HUP
+set -o notify               # NOTIFY
+IGNOREEOF=1                 # IGNOREEOF, less patient than zsh's ten
+
+
+## History
+HISTFILE="$XDG_STATE_HOME/bash/history"
+HISTSIZE=1000
+HISTFILESIZE=1000
+HISTCONTROL=ignorespace:ignoredups:erasedups   # HIST_IGNORE_(SPACE|ALL_DUPS)
+HISTTIMEFORMAT='%F %T '                        # EXTENDED_HISTORY
+shopt -s histappend         # APPEND_HISTORY
+shopt -s cmdhist            # HIST_REDUCE_BLANKS, roughly
+shopt -s histverify         # HIST_VERIFY
+[[ -d ${HISTFILE%/*} ]] || mkdir -p -m 700 "${HISTFILE%/*}"
+
+
+## Prompt
+__prompt() {
+  local status=$?
+  history -a   # INC_APPEND_HISTORY
+
+  local reset=$'\001\e[0m\002' blue=$'\001\e[34m\002' \
+        grey=$'\001\e[90m\002' green=$'\001\e[32m\002' red=$'\001\e[31m\002'
+
+  local git=
+  if command -v git >/dev/null; then
+    local branch
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null ||
+             git rev-parse --short HEAD 2>/dev/null)
+    if [[ -n $branch ]]; then
+      [[ -n $(git status --porcelain -uno --ignore-submodules 2>/dev/null) ]] &&
+        branch+='*'
+      git=" ${grey}${branch}${reset}"
+    fi
+  fi
+
+  local caret=$green
+  (( status != 0 )) && caret=$red
+  PS1="\n${blue}\w${reset}${git}\n${caret}❯${reset} "
+}
+PROMPT_COMMAND=__prompt
+
+
+## Completion
+# Whatever the distro happens to ship. Not going to vendor bash-completion!
+if ! shopt -oq posix; then
+  for _f in /usr/share/bash-completion/bash_completion \
+            /etc/bash_completion \
+            /opt/homebrew/etc/profile.d/bash_completion.sh; do
+    [[ -r $_f ]] && { . "$_f"; break; }
+  done
+  unset _f
+fi
+bind 'set completion-ignore-case on'
+bind 'set completion-prefix-display-length 3'
+bind 'set show-all-if-ambiguous on'     # AUTO_LIST
+bind 'set menu-complete-display-prefix on'
+bind 'set colored-stats on'
+bind 'set colored-completion-prefix on'
+
+
+## Keybinds
+# zsh-vi-mode, minus everything that made it worth using
+set -o vi
+bind 'set bell-style none'         # no BEEP BEEP, NOT A SHEEP
+bind -m vi-insert '"\C-a": beginning-of-line'
+bind -m vi-insert '"\C-e": end-of-line'
+bind -m vi-insert '"\C-b": backward-word'
+bind -m vi-insert '"\C-f": forward-word'
+bind -m vi-insert '"\C-k": kill-line'
+bind -m vi-insert '"\C-x\C-v": complete-command'
+bind -m vi-insert '"\e[A": history-search-backward'
+bind -m vi-insert '"\eOA": history-search-backward'
+bind -m vi-insert '"\e[B": history-search-forward'
+bind -m vi-insert '"\eOB": history-search-forward'
+
+## External programs
+if command -v fd >/dev/null; then
+  export FZF_DEFAULT_OPTS="--reverse --ansi"
+  export FZF_DEFAULT_COMMAND="fd ."
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND="fd -t d . $HOME"
+fi
+if command -v bat >/dev/null; then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  export MANROFFOPT='-c'
+fi
+# No hey.cache out here, so these are three forks a shell. Bash is the fallback
+# config; it doesn't have to be fast, it has to work.
+command -v dircolors >/dev/null && eval "$(dircolors -b)"
+command -v zoxide >/dev/null && eval "$(zoxide init bash)"
+command -v fzf >/dev/null && eval "$(fzf --bash 2>/dev/null)"
+
+# Setup pyenv (from Bekaboo/dot; guarded, so a no-pyenv remote still works)
+if has pyenv; then
+  eval "$(pyenv init - bash)"
+fi
+
+# Setup miniconda (ditto)
+[[ -r /opt/miniconda3/etc/profile.d/conda.sh ]] &&
+  source /opt/miniconda3/etc/profile.d/conda.sh
+
+
+## Functions (from Bekaboo/dot; all guarded by has() inside)
+__ff_open_files_or_dir() {
+  # $@: files to open
+  # Split targets into a list at newline
+  local -a targets_list=()
+  IFS=$'\n' read -rd '' -a targets_list <<<"$@"
+
+  # If only one target and it is a directory, cd into it
+  if [[ "${#targets_list[@]}" = 1 && -d "${targets_list[0]}" ]]; then
+    cd "${targets_list[0]}" || return
+  fi
+
+  # Copy text files and directories to a separate array and
+  # use $EDITOR to open them; open other files with xdg-open
+  local -a text_or_dirs=()
+  local -a others=()
+  for target in "${targets_list[@]}"; do
+    if [[ -d "$target" || "$(file -b -- "$target")" =~ text|empty ]]; then
+      text_or_dirs+=("$target")
+    else
+      others+=("$target")
+    fi
+  done
+
+  if has xdg-open; then
+    for target in "${others[@]}"; do
+      xdg-open "$target" >/dev/null 2>&1
+    done
+  elif (("${#others[@]}" > 0)); then
+    echo "xdg-open not found, omit opening files:" "${targets_list[@]}" >&2
+  fi
+  if (("${#text_or_dirs[@]}" > 0)); then
+    "${EDITOR:-vi}" "${text_or_dirs[@]}"
+  fi
+}
+
+# Use fzf to open files or cd to directories
+ff() {
+  # $1: base directory
+  # $2: optional initial query
+  local -r path=${1:-$PWD}
+  local -r query=$2
+
+  # If there is only one target and it is a file, open it directly
+  if (($# == 1)) && [[ -f "$path" ]]; then
+    __ff_open_files_or_dir "$@"
+    return
+  fi
+
+  if ! has fzf; then
+    echo 'fzf is not executable' >&2
+    return 1
+  fi
+
+  local -r tmpfile=$(mktemp)
+  trap 'rm -f "$tmpfile"' EXIT INT TERM HUP
+
+  # On some systems, e.g. Ubuntu, fd executable is installed as 'fdfind'
+  local -r fd_cmd=$(has fd && echo fd || echo fdfind)
+  if has "$fd_cmd"; then
+    "$fd_cmd" -0 -p -H -L -td -tf -tl -c=always --search-path="$path" |
+      fzf --read0 --ansi --query="$query" >"$tmpfile"
+  elif has find; then
+    find "$path" -print0 -type d -o -type f -o -type l -follow |
+      fzf --read0 --ansi --query="$query" >"$tmpfile"
+  else
+    echo 'fd/find is not executable' >&2
+    return 1
+  fi
+
+  local -r targets=$(cat "$tmpfile")
+  if [[ -z "$targets" ]]; then
+    return 0
+  fi
+
+  __ff_open_files_or_dir "$targets"
+  return
+}
+
+# Open nvim/vim/vi, whichever exists
+v() {
+  for vim_cmd in nvim vim vi; do
+    if has "$vim_cmd"; then
+      "$vim_cmd" "$@"
+      return
+    fi
+  done
+  echo 'nvim/vim/vi not found' >&2
+  return 1
+}
+
+# Clear both screen and all previous outputs, works on Linux & macOS
+clear() {
+  printf '\33c\e[3J'
+}
+
+
+## Directory tracking (from Bekaboo/dot)
+# List current directory on directory change, see `__post_cd` below
+__autols() {
+  local -r output=$(ls -C --color 2>/dev/null)
+
+  if [[ -z "$output" ]]; then
+    return
+  fi
+
+  local max_lines=4
+  local num_lines=4
+
+  if has tput && has wc; then
+    local -r lines=$(tput lines)
+    local -r max_lines=$((lines / 4))
+    local -r num_lines=$(printf '%s\n' "$output" | wc -l | xargs) # trim whitespaces
+  fi
+
+  if [[ "$num_lines" -le "$max_lines" ]]; then
+    printf '%s\n' "$output"
+  else
+    printf '%s\n' "$output" | head -n "$max_lines"
+    echo
+    echo "... $num_lines lines total"
+  fi
+}
+
+# Automatically activate or deactivate python virtualenvs
+__python_venv() {
+  local path=$PWD
+  while [[ "$path" != "$(dirname "$path")" ]]; do
+    for venv_dir in 'venv' 'env' '.venv' '.env'; do
+      local activation_file=$path/$venv_dir/bin/activate
+      if [[ -f "$activation_file" ]]; then
+        source "$activation_file"
+        return
+      fi
+    done
+    path="$(dirname "$path")"
+  done
+
+  if [[ -n "$VIRTUAL_ENV" ]] && has deactivate; then
+    deactivate
+  fi
+}
+__python_venv
+
+# Track directory changes and run post-cd actions
+__prev_dir=$PWD
+__post_cd() {
+  if [[ "$PWD" == "$__prev_dir" ]]; then
+    return
+  fi
+  __prev_dir=$PWD
+
+  __autols
+  __python_venv
+}
+
+PROMPT_COMMAND=${PROMPT_COMMAND:+$PROMPT_COMMAND; }__post_cd
+
+
+## Aliases
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias q=exit
+alias clr=clear
+alias sudo='sudo '
+alias rm='rm -i'
+alias mkdir='mkdir -pv'
+alias wget='wget -c'
+alias path='echo -e ${PATH//:/\\n}'
+alias ports='netstat -tulanp'
+alias mk=make
+alias gurl='curl --compressed'
+alias l='ls -lhF --color=auto'
+alias ll='ls -alhF --color=auto'
+alias la='LC_COLLATE=C ls -alF --color=auto'
+
+# An rsync that respects gitignore
+rcp() {
+  rsync -azPJ \
+    --include=.git/ \
+    --filter=':- .gitignore' \
+    --filter=":- $XDG_CONFIG_HOME/git/ignore" \
+    "$@"
+}
+alias rcpd='rcp --delete --delete-after'
+alias rcpu='rcp --chmod=go='
+alias rcpdu='rcpd --chmod=go='
+
+mkcd() { mkdir "$1" && cd "$1"; }
+
+if command -v systemctl >/dev/null; then
+  alias jc='journalctl -xe'
+  alias jcu='journalctl -xe -u'
+  alias sc=systemctl
+  alias scu='systemctl --user'
+  alias scur='systemctl --user restart'
+  alias scus='systemctl --user status'
+  alias ssc='sudo systemctl'
+  alias sscr='sudo systemctl restart'
+  alias sscs='sudo systemctl status'
+fi
+
+if command -v nix >/dev/null; then
+  alias n=nix
+  alias nf='nix flake'
+  alias nr='nix repl'
+  alias ns='nix search'
+  alias nsp='nix search nixpkgs'
+fi
+
+# Anything host-specific I don't want to push around
+[[ -r $XDG_CONFIG_HOME/bash/local.bash ]] && . "$XDG_CONFIG_HOME/bash/local.bash"
