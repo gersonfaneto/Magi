@@ -1,0 +1,18 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+local RUN_DIR=$(dirname "$(nvim --clean --headless +"lua io.write(vim.fn.stdpath('run'))" +qa!)")
+local APPNAME=${NVIM_APPNAME:-nvim}
+
+# Nvim can leave unused sockets on system.
+# Only return sockets that still have an owning process using lsof so callers
+# do not fan out to stale paths.
+lsof -Fn -U 2>/dev/null |
+  sed -n 's/^n//p' |
+  sed 's/ type=[A-Z]*$//' |
+  grep -E "/$APPNAME\.[0-9]+\.0$" |
+  while IFS= read -r sock; do
+    case "$sock" in
+      "$RUN_DIR"/*) printf '%s\n' "$sock" ;;
+    esac
+  done

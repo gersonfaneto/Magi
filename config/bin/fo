@@ -1,0 +1,25 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+main() {
+  # Use a temporary file to store the file list
+  tmpfile=$(mktemp)
+  trap 'rm -f "$tmpfile"' EXIT INT TERM HUP
+
+  # Get oldfiles from nvim and filter existing files
+  nvim -u NONE --headless +'lua io.write(table.concat(vim.v.oldfiles, "\n") .. "\n")' +qa |
+    sed -e 's/^\s*\S*:\/\///' |
+    while read -r file; do
+      [[ -e $file ]] && print -r -- "$file"
+    done |
+    fzf >"$tmpfile"
+
+  # Check if we got any files
+  if [[ -s $tmpfile ]]; then
+    # Use xargs to handle multiple files properly
+    # shellcheck disable=SC2086 # `$EDITOR` can have spaces and flags
+    xargs ${=EDITOR:-nvim} <"$tmpfile"
+  fi
+}
+
+main "$@"

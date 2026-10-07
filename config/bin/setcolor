@@ -1,0 +1,47 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+#
+# Set the colourscheme for the whole desktop.
+#
+# SYNOPSIS:
+#   setcolor [COLORSCHEME]
+#
+# DESCRIPTION:
+#   Switches the palette source to the named scheme and re-renders every
+#   consumer through theme.py: foot, highlight, nvim, Hyprland, Qt and the
+#   Quickshell surfaces. With no argument, the registry's default scheme is
+#   used.
+#
+# ARGUMENTS:
+#   * COLORSCHEME @arg-colorscheme  e.g. nano, macro, sonokai (default: nano)
+#
+# The scheme list lives in config/theme/schemes.json. `magi theme list` prints
+# the selectable names.
+
+main() {
+  local color='' arg
+  for arg in "$@"; do
+    case "$arg" in
+      -h | --help)
+        print "Usage: ${0:t} [<colorscheme>]"
+        exit
+        ;;
+      *)
+        color="$arg"
+        ;;
+    esac
+  done
+
+  if ! command -v magi >/dev/null 2>&1; then
+    print -u2 "Error: 'magi' not found"
+    return 1
+  fi
+
+  if [[ -n $color ]]; then
+    magi theme set "$color"
+  else
+    magi theme set
+  fi
+}
+
+main "$@"

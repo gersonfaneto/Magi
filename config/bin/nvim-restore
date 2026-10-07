@@ -1,0 +1,5 @@
+#!/bin/sh
+# Launched by tmux-resurrect in the pane's saved working directory. Wait for
+# UIEnter so opt plugin specs (fugitive, etc.) are registered before sourcing
+# the session, then restore the workspace autosaved for this directory.
+exec nvim -c 'lua local s = require("minimal.plugin.session"); vim.api.nvim_create_autocmd("UIEnter", { once = true, callback = function() s.load() end })'

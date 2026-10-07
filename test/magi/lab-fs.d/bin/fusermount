@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deterministic stand-in for fusermount in test/magi/lab-fs.janet.
+printf 'fusermount %s\n' "$*" >>"${FS_TEST_LOG:?}"
+exit "${FUSERMOUNT_EXIT:-1}"

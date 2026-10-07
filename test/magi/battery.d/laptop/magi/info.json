@@ -1,0 +1,16 @@
+{
+  "desktop": "hyprland",
+  "battery": {
+    "low": 20,
+    "critical": 10,
+    "action": 5,
+    "grace": 0,
+    "strategy": "hibernate",
+    "guardSleep": true,
+    "notify": true,
+    "sound": false,
+    "repeat": 300,
+    "cooldown": 300,
+    "interval": 20
+  }
+}

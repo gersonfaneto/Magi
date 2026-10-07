@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deterministic stand-in for sshfs in test/magi/lab-fs.janet.
+printf 'sshfs %s\n' "$*" >>"${FS_TEST_LOG:?}"
+exit "${SSHFS_EXIT:-0}"

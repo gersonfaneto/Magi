@@ -1,0 +1,45 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+local script_name=${0:t}
+
+md2tex() {
+  pandoc \
+    --standalone \
+    -f markdown-implicit_figures \
+    -t latex \
+    "$1" \
+    -o "${1%.md}.tex"
+}
+
+main() {
+  if [[ $# -eq 0 ]]; then
+    print -u2 "Error: no input files"
+    printf "Usage: %s files...\n" "$script_name" >&2
+    return 1
+  fi
+
+  local rc=0
+  local file oldpwd
+
+  for file in "$@"; do
+    oldpwd=$PWD
+
+    # Pictures in markdown cannot be fetched if we are not in the same
+    # directory
+    cd "$(dirname "$(realpath "$file")")" || return
+
+    if ! md2tex "$(basename "$file")"; then
+      rc=$?
+      print -u2 "md2tex: error: pandoc failed to convert '$file' with exit code $rc"
+      cd "$oldpwd" || return
+      rc=1
+    fi
+
+    cd "$oldpwd" || return
+  done
+
+  return "$rc"
+}
+
+main "$@"

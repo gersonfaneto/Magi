@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deterministic stand-in for umount in test/magi/lab-fs.janet.
+printf 'umount %s\n' "$*" >>"${FS_TEST_LOG:?}"
+exit "${UMOUNT_EXIT:-1}"

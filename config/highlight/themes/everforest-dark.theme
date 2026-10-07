@@ -1,0 +1,39 @@
+-- vim: ft=lua:et:ts=2:sts=2:sw=2:
+
+Description = 'Everforest Dark Theme'
+Categories = { 'dark' }
+
+local palette = {
+    background = '#2d353b',
+    foreground = '#d8caac',
+    black      = '#3c474d',
+    red        = '#e68183',
+    green      = '#a7c080',
+    yellow     = '#d9bb80',
+    blue       = '#83b6af',
+    magenta    = '#d39bb6',
+    cyan       = '#87c095',
+    white      = '#d8caac',
+    orange     = '#e69875',
+}
+
+Default       = { Colour   = palette.foreground }
+Canvas        = { Colour   = palette.background }
+Number        = { Colour   = palette.magenta }
+Escape        = { Colour   = palette.yellow }
+String        = { Colour   = palette.green }
+BlockComment  = { Colour   = palette.black }
+PreProcessor  = { Colour   = palette.magenta }
+LineNum       = { Colour   = palette.black }
+Operator      = { Colour   = palette.orange }
+Keywords      = {
+  { Colour = palette.green },
+  { Colour = palette.magenta },
+  { Colour = palette.yellow },
+  { Colour = palette.orange },
+  { Colour = palette.blue },
+  { Colour = palette.cyan },
+}
+Interpolation = Operator
+StringPreProc = String
+LineComment   = BlockComment

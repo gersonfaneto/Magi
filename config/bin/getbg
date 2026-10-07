@@ -1,0 +1,52 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Print the system background mode for this Hyprland + Quickshell desktop.
+#
+# The applied palette bundle is the source of truth: theme.py resolves washi,
+# scheme and dynamic into current.json, whose tone is what every surface is
+# actually wearing. Fall back to the flags file, then gsettings
+# (GTK apps), then the time of day (suggestbg).
+
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+
+bundle_bg() {
+  local palette=$STATE_HOME/quickshell/palettes/current.json
+  [[ -r $palette ]] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  local tone
+  tone=$(jq -r '.tone // empty' "$palette" 2>/dev/null) || return 1
+  case $tone in
+    dark | light) print "$tone" ;;
+    *) return 1 ;;
+  esac
+}
+
+flags_bg() {
+  local flags=$STATE_HOME/quickshell/flags.json
+  [[ -r $flags ]] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  local tone
+  tone=$(jq -r '.bg // empty' "$flags" 2>/dev/null) || return 1
+  case $tone in
+    dark | light) print "$tone" ;;
+    *) return 1 ;;
+  esac
+}
+
+gsettings_bg() {
+  command -v gsettings >/dev/null 2>&1 || return 1
+
+  if gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null | grep -q prefer-dark ||
+    gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | grep -qi dark; then
+    print dark
+  else
+    print light
+  fi
+}
+
+if ! bundle_bg && ! flags_bg && ! gsettings_bg; then
+  print -u2 "getbg: could not detect the desktop mode, falling back to the clock"
+  suggestbg
+fi

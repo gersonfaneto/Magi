@@ -1,0 +1,36 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Check sunrise/sunset and print the suggested background (light or dark).
+
+# Use the current time to determine if it's day or night
+bg_by_clock() {
+  local hour=${$(date +%H)#0}
+  if (( hour > 6 && hour < 18 )); then
+    print light
+  else
+    print dark
+  fi
+  exit
+}
+
+# Use `sunwait` and the current location to determine if it's day or night
+# $1: latitude, e.g. 55.6013N
+# $2: longitude, e.g. 83.7034W
+bg_by_sun() {
+  if [[ $(sunwait poll "$1" "$2") == DAY ]]; then
+    print light
+  else
+    print dark
+  fi
+}
+
+# If `sunwait` is not installed, use the current time instead
+if ! command -v sunwait >/dev/null 2>&1; then
+  bg_by_clock
+fi
+
+location=$(whereami)
+[[ -n $location ]] || bg_by_clock
+
+# location is 'latitude longitude'; split it on whitespace
+bg_by_sun ${=location}
