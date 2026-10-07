@@ -1,0 +1,176 @@
+# test/nixos/modules/hey.nix --- tests for modules/hey.nix
+#
+# This module decides what `hey` is on a running system, and almost everything
+# it declares is a runtime contract that fails quietly. hey.hooks in particular
+# had no coverage at all, which is how bin/hey.d/hook.janet came to ignore the
+# NN- prefixes this module spends a function generating.
+
+{ evalConfig, mkHey, presets, lib, ... }:
+
+with lib;
+let
+  inherit (presets) bare;
+
+  hooked = evalConfig [{
+    hey.hooks.onFoo = {
+      bar = "echo bar";
+      # Already numbered: the number is the order, the rest is the name.
+      "10-baz" = "echo baz";
+    };
+    hey.hooks.onBar.bar = "echo bar";
+    hey.hookPaths = [ "/elsewhere" ];
+  }];
+
+  dataDir = hooked.home.dataDir;
+  hasPath = cfg: p: elem "${cfg.hey.dir}/${p}" cfg.hey.hookPaths;
+  failing = c: map (a: a.message) (filter (a: !a.assertion) c.assertions);
+in {
+  ## Hooks.
+
+  # One directory per fragment NAME, one NN-HOOK file per hook in it, so each
+  # is just another hooks dir to `hey hook`. The 50- is what leaves room on
+  # both sides for a host to sequence itself against. The fragments are zsh (a
+  # missing shebang would make them sh) and have to be executable: `hey hook`
+  # drops a handler that isn't, and `hey hook -l` hides it too.
+  testHooksLandNumberedExecutableAndZsh =
+    let file = hooked.home.dataFile."hey/hooks.d/bar.d/50-onFoo"; in {
+      expr = {
+        names = sort lessThan (filter (hasPrefix "hey/hooks.d/") (attrNames hooked.home.dataFile));
+        executable = file.executable;
+        zsh = hasPrefix "#!/usr/bin/env zsh\n" file.text;
+      };
+      expected = {
+        names = [ "hey/hooks.d/bar.d/50-onBar"
+                  "hey/hooks.d/bar.d/50-onFoo"
+                  "hey/hooks.d/baz.d/10-onFoo" ];
+        executable = true;
+        zsh = true;
+      };
+    };
+
+  # hey.hookPaths is the whole of what `hey hook` searches, via info.json. The
+  # built-ins go first -- they're the tie-breaker -- and have to survive a
+  # module setting its own, which an option default wouldn't. The host's is the
+  # live checkout's, not hostDir's store copy.
+  testHookPathsSeedHostAndFragmentsFirst = {
+    expr = {
+      head = take 3 hooked.hey.hookPaths;
+      mine = elem "/elsewhere" hooked.hey.hookPaths;
+      published = hooked.hey.info.hooks == hooked.hey.hookPaths;
+    };
+    expected = {
+      # The host's hooks come off the live checkout, keyed by hostName, not
+      # off the snapshot's hostDir.
+      head = [ "${hooked.hey.dir}/hosts/${hooked.networking.hostName}/hooks"
+               "${dataDir}/hey/hooks.d/bar.d"
+               "${dataDir}/hey/hooks.d/baz.d" ];
+      mine = true;
+      published = true;
+    };
+  };
+
+  # The point of the list: an area fires only if this host enables it. The WM's
+  # dir comes from hey.desktop, which a tty hasn't got; dms and noctalia add
+  # their own; config/dms/hooks existing on disk proves nothing.
+  testHookPathsFollowEnabledAreas = {
+    expr = {
+      hypr = hasPath presets.hyprland "config/hypr/hooks";
+      noctalia = hasPath presets.hyprland "config/noctalia/hooks";
+      # dms = hasPath presets.hyprland "config/dms/hooks";
+      # dmsOn = hasPath (evalConfig [{
+      #   modules.wm.desktop = "hyprland";
+      #   modules.wm.dms.enable = true;
+      # }]) "config/dms/hooks";
+      headless = hasPath presets.bare "config/hypr/hooks";
+    };
+    expected = {
+      # dms = false; dmsOn = true;
+      hypr = true; noctalia = true; headless = false;
+    };
+  };
+
+  ## JANET_PATH.
+
+  # janet makes the LAST entry :syspath and searches it ahead of every other, so
+  # last means wins. My tree goes there; hey's own libraries (what the janet
+  # scripts hey dispatches to but doesn't compile in import from) are the
+  # fallback. Get this backwards and a `jpm install`ed spork silently loses to
+  # hey's pinned one. JANET_TREE has to name the same directory, or jpm
+  # installs somewhere janet never looks.
+  #
+  # And no store paths: session vars are frozen at login, so one here pins the
+  # scripts to whatever libs I logged in with, however many syncs ago.
+  testJanetPathPutsMyOwnTreeLast =
+    let v = bare.environment.sessionVariables;
+        path = splitString ":" v.JANET_PATH;
+    in {
+      expr = {
+        mine = last path == "${v.JANET_TREE}/lib";
+        heys = head path == "/etc/hey/janet"
+               && hasSuffix "-hey-janet-libs" "${bare.environment.etc."hey/janet".source}";
+        pinned = any (hasPrefix builtins.storeDir) path;
+      };
+      expected = { mine = true; heys = true; pinned = false; };
+    };
+
+  ## The desktop.
+
+  # lib/hey/lib.janet's `wm` reads this out of info.json to find config/NAME.
+  # It used to read XDG_CURRENT_DESKTOP, which a tty hasn't got. Headless is
+  # null, which spork drops on the way back in, so `wm` sees an absent key and
+  # tells you which option to set.
+  testDesktopIsPublishedToInfo = {
+    expr = {
+      hyprland = presets.hyprland.hey.info.desktop;
+      headless = bare.hey.info.desktop;
+    };
+    expected = { hyprland = "hyprland"; headless = null; };
+  };
+
+  ## The checkout.
+
+  # hey.dir is the one knob. The rest of the family, and everything the built
+  # system links or sources off it, follow, so a host whose checkout lives
+  # elsewhere is one line, not a hunt through modules/.
+  testDirsFollowDir =
+    let moved = evalConfig [{ hey.dir = "/elsewhere"; }]; in {
+      expr = {
+        inherit (moved.hey) binDir libDir configDir modulesDir;
+        sounds = moved.home.dataLink."sounds/hey";
+        hooks = hasPrefix "/elsewhere/hosts/" (head moved.hey.hookPaths);
+      };
+      expected = {
+        binDir = "/elsewhere/bin"; libDir = "/elsewhere/lib";
+        configDir = "/elsewhere/config"; modulesDir = "/elsewhere/modules";
+        sounds = "/elsewhere/assets/sounds";
+        hooks = true;
+      };
+    };
+
+  # A store path is the one value it must never take: everything off it would
+  # be pinned to a snapshot, and under pure eval pathExists wouldn't even say
+  # so. This file is in the store whenever this suite runs, so it's the fixture.
+  # The default gets the same check, since that's what every host runs on.
+  testDirRefusesTheStore = {
+    expr = {
+      stored = any (hasInfix "hey.dir") (failing (evalConfig [{ hey.dir = toString ./.; }]));
+      live = any (hasInfix "hey.dir") (failing bare);
+    };
+    expected = { stored = true; live = false; };
+  };
+
+  ## The binary.
+
+  # config.hey.bin is how units call hey by store path. It has to be the
+  # package's exe and not the flake's outPath; and `"${self}"` has to stay the
+  # outPath, since that's what reads through the snapshot expect it to be.
+  testHeyBinIsTheExeNotTheSnapshot =
+    let self = mkHey {}; in {
+      expr = {
+        exe = hasSuffix "/bin/hey" bare.hey.bin;
+        notSource = !(hasPrefix self.outPath bare.hey.bin);
+        snapshot = "${self}" == self.dir;
+      };
+      expected = { exe = true; notSource = true; snapshot = true; };
+    };
+}

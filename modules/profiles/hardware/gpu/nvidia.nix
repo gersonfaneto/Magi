@@ -1,0 +1,97 @@
+# profiles/hardware/common/gpu/nvidia/default.nix --- lipstick on a pig
+#
+# I have NVIDIA cards on all my machines. Fortunately, mine aren't too old and
+# are relatively beefy (680gtx, 960gtx, 1080, 1660S, 3080ti) so only a little
+# cludge is needed to get them to work well on NixOS.
+
+{ self, lib, config, pkgs, ... }:
+
+with lib;
+with self.lib;
+let hardware = config.modules.profiles.hardware;
+in mkIf (any (s: hasPrefix "gpu/nvidia" s) hardware) (mkMerge [
+  {
+    services.xserver.videoDrivers = mkDefault [ "nvidia" ];
+
+    hardware = {
+      graphics = {
+        enable = true;
+        enable32Bit = true;
+        extraPackages = [
+          pkgs.libva-vdpau-driver
+        ];
+      };
+      nvidia = {
+        # Use the NVidia open source kernel module (not to be confused with the
+        # independent third-party "nouveau" open source driver). Support is
+        # limited to the Turing and later architectures. Full list of supported
+        # GPUs is at:
+        # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
+        # Only available from driver 515.43.04+. Currently alpha-quality/buggy,
+        # so false is currently the recommended setting.
+        open = mkDefault true;
+        # Save some idle watts.
+        powerManagement.enable = true;  # see NixOS/nixos-hardware#348
+        modesetting.enable = true;
+        package = mkDefault config.boot.kernelPackages.nvidiaPackages.latest;
+      };
+    };
+
+    environment = {
+      systemPackages = with pkgs; [
+        # Respect XDG conventions, damn it!
+        (mkWrapper config.hardware.nvidia.package.settings ''
+          wrapProgram "$out/bin/nvidia-settings" \
+            --run 'mkdir -p "$XDG_CONFIG_HOME/nvidia"' \
+            --append-flags '--config="$XDG_CONFIG_HOME/nvidia/rc.conf"'
+        '')
+
+        vulkan-tools
+      ];
+    };
+
+    programs.firefox.preferences."media.hardware-video-decoding.force-enabled" = true;
+    # nvidia-vaapi-driver can't run inside the RDD sandbox
+    environment.sessionVariables.MOZ_DISABLE_RDD_SANDBOX = "1";
+  }
+
+  (mkIf (elem "gpu/nvidia/kepler" hardware) {
+    # Last one supporting Kepler architecture
+    hardware.nvidia = {
+      open = mkForce false;
+      package = mkForce config.boot.kernelPackages.nvidiaPackages.legacy_470;
+    };
+  })
+
+  (mkIf (elem "gpu/nvidia/turing" hardware) {
+    # see NixOS/nixos-hardware#348
+    hardware.nvidia = {
+      powerManagement.finegrained = true;
+      nvidiaPersistenced = true;
+    };
+  })
+
+  (mkIf (config.modules.wm.desktop == "hyprland") {
+    # see NixOS/nixos-hardware#348
+    # TODO: Try these!
+    environment.systemPackages = with pkgs; [
+      libva
+      # Fixes crashes in Electron-based apps?
+      # libsForQt5.qt5ct
+      # libsForQt5.qt5-wayland
+    ];
+
+    environment.sessionVariables = {
+      LIBVA_DRIVER_NAME = "nvidia";
+      WLR_NO_HARDWARE_CURSORS = "1";
+
+      NVD_BACKEND = "direct";
+      # May cause Firefox crashes
+      GBM_BACKEND = "nvidia-drm";
+
+      # If you face problems with Discord windows not displaying or screen
+      # sharing not working in Zoom, remove or comment this:
+      __GLX_VENDOR_LIBRARY_NAME = "nvidia";
+    };
+  })
+])

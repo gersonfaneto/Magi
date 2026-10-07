@@ -1,0 +1,106 @@
+# default.nix
+
+{ self, lib, options, config, pkgs, ... }:
+
+with lib;
+with self.lib;
+{
+  imports = mapModulesRec' ./modules import;
+
+  options = with types; {
+    modules = {};
+
+    # Creates a simpler, polymorphic alias for users.users.$USER.
+    user = mkOption {
+      type =
+        let elemType = options.users.users.type.nestedTypes.elemType;
+        in elemType.substSubModules (elemType.getSubModules ++ [
+             { config.name = mkOverride 500 ""; }
+           ]);
+      default = {};
+    };
+  };
+
+  config = {
+    assertions = [{
+      assertion = config.user.name != "";
+      message = "config.user.name is not set!";
+    }];
+
+    environment.sessionVariables = mkOrder 10 {
+      NIXPKGS_ALLOW_UNFREE = "1";   # Forgive me Stallman-senpai.
+    };
+
+    user = {
+      description = mkDefault "The primary user account";
+      extraGroups = [ "wheel" ];
+      isNormalUser = true;
+      home = "/home/${config.user.name}";
+      group = "users";
+      uid = 1000;
+    };
+    users.users.${config.user.name} = mkAliasDefinitions options.user;
+
+
+    ## Core, universal configuration for all NixOS machines.
+    # This is here to appease 'nix flake check' for generic hosts with no
+    # hardware-configuration.nix or fileSystem config.
+    fileSystems."/".device = mkDefault "/dev/disk/by-label/nixos";
+
+    nix =
+      let filteredInputs = filterAttrs (_: v: v ? outputs) self.inputs;
+          nixPathInputs  = mapAttrsToList (n: v: "${n}=${v}") filteredInputs;
+      in {
+        extraOptions = ''
+          warn-dirty = false
+          http2 = true
+          experimental-features = nix-command flakes
+        '';
+        nixPath = nixPathInputs ++ [
+          "dotfiles=${config.hey.dir}"
+        ];
+        registry = mapAttrs (_: v: { flake = v; }) filteredInputs;
+        settings =
+          let caches = (import ./flake.nix).nixConfig;
+          in {
+            trusted-users = [ "root" config.user.name ];
+            allowed-users = [ "root" config.user.name ];
+            auto-optimise-store = true;
+            substituters = caches.extra-substituters;
+            trusted-public-keys = caches.extra-trusted-public-keys;
+          };
+      };
+
+    system = {
+      configurationRevision = mkIf (self ? rev) self.rev;
+      stateVersion = "23.11";
+    };
+
+    boot = {
+      # initrd.systemd.enable = true;
+      # Prefer the latest kernel; this will be overridden on more security
+      # conscious systems, among other settings in modules/security.nix.
+      kernelPackages = mkDefault pkgs.linuxKernel.packages.linux_xanmod_latest;
+      loader = {
+        efi.canTouchEfiVariables = mkDefault true;
+        systemd-boot = {
+          # To not overwhelm the boot screen and save space on /boot
+          configurationLimit = mkDefault 8;
+          memtest86.enable = mkDefault true;
+        };
+      };
+    };
+
+    # For unfree hardware my laptops/refurbed systems will likely have.
+    hardware.enableRedistributableFirmware = true;
+
+    # By default, journal size caps at 10% of storage; way too big.
+    services.journald.settings.Journal.SystemMaxUse = mkDefault "2G";
+
+    # For `hey sync build-vm` (or `nixos-rebuild build-vm`)
+    virtualisation.vmVariant.virtualisation = {
+      memorySize = 2048;  # default: 1024
+      cores = 2;          # default: 1
+    };
+  };
+}

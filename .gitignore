@@ -1,0 +1,20 @@
+/build/
+/result
+*.zwc
+*.janet.tested
+
+# Built on demand by config/claude/scripts/ensure-reference-*.zsh
+/config/claude/data/refs/*
+!/config/claude/data/refs/README.md
+/config/claude/data/repo/
+
+# Symlinked in by nixos modules
+*.meta.lua
+
+# Rendered by Noctalia (modules/wm/theme.nix)
+/config/zellij/themes/colors.kdl
+/config/yazi/theme.toml
+/config/yazi/flavors/
+# modules/apps/rofi.nix
+/config/rofi/themes/fonts.rasi
+/config/rofi/themes/colors.rasi

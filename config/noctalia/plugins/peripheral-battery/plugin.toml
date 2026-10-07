@@ -1,0 +1,262 @@
+# config/noctalia/plugins/peripheral-battery/plugin.toml
+#
+# The built-in battery widget draws the glyph its charge level says to draw,
+# and picks its graphic meter's orientation off the capsule's aspect ratio
+# (battery_widget.cpp: `m_isVertical = containerHeight > containerWidth`), so
+# on a top bar it is always horizontal. Neither is a setting. Hence this: a
+# vertical meter with a glyph I choose per device.
+#
+# Two entries. The service does the polling -- once, for however many widgets
+# ask -- and the widget only draws.
+#
+# The look is per state (charging, charged, discharging, low): a color dropdown
+# each for glyph, meter and percentage, plus the two plugged-in glyphs. "Default"
+# in a color dropdown is the empty string; PALETTE in widget.luau says what that
+# resolves to.
+
+id           = "hey/peripheral-battery"
+name         = "Peripheral Battery"
+version      = "1.2.0"
+plugin_api   = 24  # runAsync's argv form, for on_connect/on_disconnect
+author       = "hlissner"
+license      = "MIT"
+dependencies = ["upower", "stdbuf", "bluetoothctl"]
+tags         = ["battery", "bar"]
+icon         = "battery-vertical-3"
+description  = "A vertical battery meter with a per-device glyph, for peripherals."
+
+# Plugin-level, so the service sees it too (widget settings don't reach it).
+[[setting]]
+key             = "poll_seconds"
+type            = "int"
+label_key       = "settings.poll_seconds.label"
+description_key = "settings.poll_seconds.description"
+default         = 30
+min             = 5
+max             = 600
+
+[[setting]]
+key             = "notify"
+type            = "select"
+label_key       = "settings.notify.label"
+description_key = "settings.notify.description"
+default         = "never"
+options = [
+  { value = "never",      label_key = "settings.notify.options.never" },
+  { value = "both",       label_key = "settings.notify.options.both" },
+  { value = "connect",    label_key = "settings.notify.options.connect" },
+  { value = "disconnect", label_key = "settings.notify.options.disconnect" },
+]
+
+[[setting]]
+key             = "on_connect"
+type            = "string"
+label_key       = "settings.on_connect.label"
+description_key = "settings.on_connect.description"
+default         = ""
+
+[[setting]]
+key             = "on_disconnect"
+type            = "string"
+label_key       = "settings.on_disconnect.label"
+description_key = "settings.on_disconnect.description"
+default         = ""
+
+[[service]]
+id    = "poll"
+entry = "poll.luau"
+
+[[widget]]
+id    = "battery"
+entry = "widget.luau"
+
+  [[widget.setting]]
+  key             = "device"
+  type            = "string"
+  label_key       = "settings.device.label"
+  description_key = "settings.device.description"
+  default         = ""
+
+  [[widget.setting]]
+  key             = "glyph"
+  type            = "glyph"
+  label_key       = "settings.glyph.label"
+  description_key = "settings.glyph.description"
+  default         = "battery-vertical"
+
+  [[widget.setting]]
+  key             = "show_label"
+  type            = "bool"
+  label_key       = "settings.show_label.label"
+  default         = true
+
+  [[widget.setting]]
+  key             = "warn_below"
+  type            = "int"
+  label_key       = "settings.warn_below.label"
+  description_key = "settings.warn_below.description"
+  default         = 20
+  min             = 0
+  max             = 100
+
+  [[widget.setting]]
+  key             = "full_at"
+  type            = "int"
+  label_key       = "settings.full_at.label"
+  description_key = "settings.full_at.description"
+  default         = 95
+  min             = 50
+  max             = 100
+
+  [[widget.setting]]
+  key             = "show_charge_glyph"
+  type            = "bool"
+  label_key       = "settings.show_charge_glyph.label"
+  description_key = "settings.show_charge_glyph.description"
+  default         = true
+
+  [[widget.setting]]
+  key             = "charging_glyph"
+  type            = "glyph"
+  label_key       = "settings.charging_glyph.label"
+  default         = "bolt-filled"
+  visible_when    = { key = "show_charge_glyph", values = ["true"] }
+
+  [[widget.setting]]
+  key             = "charged_glyph"
+  type            = "glyph"
+  label_key       = "settings.charged_glyph.label"
+  default         = "plug-filled"
+  visible_when    = { key = "show_charge_glyph", values = ["true"] }
+
+  # Plugged in, below full_at.
+  [[widget.setting]]
+  key             = "charging_glyph_color"
+  type            = "color"
+  label_key       = "settings.charging_glyph_color.label"
+  description_key = "settings.charging_glyph_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "charging_meter_color"
+  type            = "color"
+  label_key       = "settings.charging_meter_color.label"
+  description_key = "settings.charging_meter_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "charging_label_color"
+  type            = "color"
+  label_key       = "settings.charging_label_color.label"
+  description_key = "settings.charging_label_color.description"
+  default         = ""
+  advanced        = true
+
+
+  # Plugged in, at or above full_at (or upower says fully-charged).
+  [[widget.setting]]
+  key             = "charged_glyph_color"
+  type            = "color"
+  label_key       = "settings.charged_glyph_color.label"
+  description_key = "settings.charged_glyph_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "charged_meter_color"
+  type            = "color"
+  label_key       = "settings.charged_meter_color.label"
+  description_key = "settings.charged_meter_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "charged_label_color"
+  type            = "color"
+  label_key       = "settings.charged_label_color.label"
+  description_key = "settings.charged_label_color.description"
+  default         = ""
+  advanced        = true
+
+
+  # Unplugged, above warn_below.
+  [[widget.setting]]
+  key             = "discharging_glyph_color"
+  type            = "color"
+  label_key       = "settings.discharging_glyph_color.label"
+  description_key = "settings.discharging_glyph_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "discharging_meter_color"
+  type            = "color"
+  label_key       = "settings.discharging_meter_color.label"
+  description_key = "settings.discharging_meter_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "discharging_label_color"
+  type            = "color"
+  label_key       = "settings.discharging_label_color.label"
+  description_key = "settings.discharging_label_color.description"
+  default         = ""
+  advanced        = true
+
+
+  # Unplugged, at or below warn_below.
+  [[widget.setting]]
+  key             = "low_glyph_color"
+  type            = "color"
+  label_key       = "settings.low_glyph_color.label"
+  description_key = "settings.low_glyph_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "low_meter_color"
+  type            = "color"
+  label_key       = "settings.low_meter_color.label"
+  description_key = "settings.low_meter_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "low_label_color"
+  type            = "color"
+  label_key       = "settings.low_label_color.label"
+  description_key = "settings.low_label_color.description"
+  default         = ""
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "meter_width"
+  type            = "int"
+  label_key       = "settings.meter_width.label"
+  default         = 9
+  min             = 3
+  max             = 40
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "meter_height"
+  type            = "int"
+  label_key       = "settings.meter_height.label"
+  description_key = "settings.meter_height.description"
+  default         = 16
+  min             = 6
+  max             = 64
+  advanced        = true
+
+  [[widget.setting]]
+  key             = "gap"
+  type            = "int"
+  label_key       = "settings.gap.label"
+  description_key = "settings.gap.description"
+  default         = 4
+  min             = 0
+  max             = 24
+  advanced        = true

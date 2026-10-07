@@ -1,0 +1,247 @@
+# config/noctalia/bar.toml
+#
+# Serves as defaults for ~/.local/state/noctalia/settings.toml.
+
+[bar.main]
+position           = "top"
+background_opacity = 0.8
+padding            = 8
+radius             = 0
+margin_ends        = 0
+margin_edge        = 0
+font_scale         = 1.0
+shadow             = false
+reserve_space      = true
+capsule            = false
+widget_spacing     = 8
+compositor_blur    = false
+contact_shadow     = true
+
+start = [ "compass", "submap", "group:activity" ]
+center = [ "date", "clock", "weather" ]
+end = [ "media", "timer", "tray", "group:devices", "group:system", "notifications", "privacy", "screencast" ]
+show_on_workspace_switch = false
+
+    [bar.main.dead_zone.actions]
+    middle = "settings-toggle"
+
+    [[bar.main.capsule_group]]
+    enabled = true
+    fill = "surface_variant"
+    foreground = "primary"
+    id = "devices"
+    members = [ "earphones-battery", "trackpad-battery", "phone" ]
+    opacity = 0.0
+    padding = 8.0
+
+    [[bar.main.capsule_group]]
+    enabled = true
+    fill = "surface_variant"
+    foreground = "primary"
+    id = "system"
+    members = [ "battery", "caffeine", "disks", "network", "bluetooth", "input_volume", "output_volume" ]
+    opacity = 0.0
+    padding = 8.0
+
+    [[bar.main.capsule_group]]
+    enabled = true
+    fill = "surface_variant"
+    foreground = "tertiary"
+    id = "activity"
+    members = [ "cpu", "ram", "sysmon", "network_rx", "network_tx" ]
+    opacity = 0.0
+    padding = 8.0
+
+[widget.clock]
+capsule = false
+font_weight = 500
+format = "·  {:%H:%M}  ·"
+tooltip_format = "{:%I:%M %p}"
+
+    [widget.clock.actions]
+    left = "panel-toggle control-center"
+
+[widget.date]
+format = "{:%a, %d %b}"
+tooltip_format = "{:%A, %B %d %Y}"
+
+[widget.privacy]
+hide_inactive = true
+
+[widget.screencast]
+type = "hey/screencast:bar"
+capsule = true
+capsule_fill = "on_secondary"
+font_family = "Fira Mono"
+font_scale = 0.80
+icon_color = "primary"
+scale = 1.10
+
+[widget.printers]
+type = "andrewdems/printers:printer"
+
+[widget.submap]
+type = "hey/hypr-submap:hypr-submap"
+hide_when_default = true
+show_label = false
+capsule = true
+capsule_foreground = "shadow"
+capsule_fill = "tertiary"
+
+    [widget.submap.glyphs]
+    screencap = "video"
+    screenshot = "screenshot"
+    session = "power"
+    scrolloverview = "apps"
+
+[widget.timer]
+type = "hey/timer:bar"
+show_idle_on_horizontal = false
+capsule = true
+capsule_padding = 8
+capsule_fill = "tertiary"
+notify_color = "shadow"
+running_color = "surface"
+
+[widget.lid-guard]
+type = "8bury/lid-guard:lid-guard"
+
+[widget.disks]
+type = "aristides/udiskie:status"
+hide_when_empty = true
+
+[widget.tailscale]
+type = "davemhammer/tailscale:status"
+show_counts = false
+
+[widget.phone]
+type = "icefish/phone-connect:bar"
+
+[widget.trackpad-battery]
+type = "hey/peripheral-battery:battery"
+device = "Magic Trackpad"
+glyph = "device-ipad"
+meter_height = 10
+meter_width = 3
+gap = 1
+show_label = false
+scale = 0.90
+charged_glyph_color = "tertiary"
+charged_label_color = "tertiary"
+charged_meter_color = "tertiary"
+discharging_glyph_color = "on_surface"
+discharging_label_color = "on_surface"
+discharging_meter_color = "on_surface"
+show_charge_glyph = false
+
+[widget.earphones-battery]
+type = "hey/peripheral-battery:battery"
+device = "TOZO-T6"
+glyph = "bluetooth-device-earbuds"
+meter_height = 10
+meter_width = 3
+show_label = false
+gap = 1
+charged_glyph_color = "tertiary"
+charged_label_color = "tertiary"
+charged_meter_color = "tertiary"
+discharging_glyph_color = "on_surface"
+discharging_label_color = "on_surface"
+discharging_meter_color = "on_surface"
+show_charge_glyph = false
+
+[widget.battery]
+type = "battery"
+device = "auto"
+hide_when_full = true
+
+[widget.bluetooth]
+hide_when_adapter_off = true
+hide_when_no_connected_device = true
+
+[widget.gap]
+length = 18
+
+[widget.weather]
+show_condition = false
+
+[widget.workspaces]
+focused_output_only = true
+show_labels = false
+
+[widget.network]
+show_label = false
+
+[widget.network_rx]
+show_value = false
+visualization = "graph"
+
+[widget.network_tx]
+show_glyph = false
+show_value = false
+visualization = "graph"
+
+[widget.input_volume]
+hide_when_inactive = true
+
+[widget.output_volume]
+show_label = false
+
+[widget.cpu]
+show_value = false
+
+[widget.ram]
+show_value = false
+
+[widget.sysmon]
+show_glyph = true
+show_value = false
+stat = "gpu_usage"
+visualization = "gauge"
+
+[widget.media]
+album_art_only = true
+hide_when_no_media = true
+show_progress = true
+max_length = 400
+title_scroll = "on_hover"
+
+    [widget.media.actions]
+    right = "exec hyprctl dispatch 'hl.dsp.focus({ window = \"class:feishin\" })'"
+
+[widget.active_window]
+capsule = false
+icon_size = 16
+max_length = 800
+
+[widget.scroll_overview]
+glyph = "apps"
+type = "custom_button"
+tooltip = "Overview"
+
+  [widget.scroll_overview.actions]
+  left  = '''exec hyprctl eval 'hey.plugins.so.overview("toggle")()' '''
+  right = '''exec hyprctl eval 'hey.plugins.so.overview("toggle all", 0.4)()' '''
+
+[widget.compass]
+type = "hey/compass:compass"
+badge_size = 12
+font_size = 10
+home_color = "tertiary"
+monitor = "focused"
+radius = 1
+size = 22
+special_home_color = "error"
+special_window_color = "secondary"
+special_workspace_color = "secondary"
+window_color = "primary"
+workspace_color = "primary"
+capsule = true
+capsule_border = "primary"
+capsule_padding = 1
+
+    [widget.compass.actions]
+    left = "exec hyprctl eval 'hey.plugins.so.overview(\"toggle\")()'"
+    right = "exec noctalia msg window-switcher"
+    scroll_down = "exec hyprctl dispatch 'hey.nav.focus(\"down\")'"
+    scroll_up = "exec hyprctl dispatch 'hey.nav.focus(\"up\")'"

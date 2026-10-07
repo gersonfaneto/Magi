@@ -1,0 +1,74 @@
+# modules/agenix.nix -- encrypt secrets in nix store
+
+{ self, lib, options, config, pkgs, ... }:
+
+with builtins;
+with lib;
+with self.lib;
+let hostKey = config.modules.agenix.hostKey;
+in {
+  imports = [ self.modules.agenix.age ];
+
+  options.modules.agenix = with types; {
+    dirs = mkOpt (listOf (either str path)) [
+      "${self.hostDir}/secrets"
+      "${self.configDir}/secrets"
+    ];
+    hostKey = mkOpt str "/etc/ssh/host_ed25519";
+  };
+
+  config = {
+    system.activationScripts.hey-agenix-host-key = mkIf (config.age.secrets != {}) ''
+      if [[ ! -e ${escapeShellArg hostKey} ]]; then
+        echo "Secrets provided, but no host key was found at ${hostKey}" >&2
+        exit 1
+      fi
+    '';
+
+    # Each system gets a host key, used for decrypting Agenix secrets and as a
+    # deployment key via Git. It's expected to be provisioned before the system
+    # is initially installe (presumably with 'hey ops push-keys $HOST' from a
+    # system with bitwarden set up).
+    programs.ssh.extraConfig = ''
+      Host *
+        IdentityFile ${hostKey}
+    '';
+
+    # Ensure this hostkey is the default key used by agenix.
+    environment.systemPackages = with pkgs; [
+      # Respect XDG, damn it!
+      (writeShellScriptBin "agenix" ''
+        ARGS=( "$@" )
+        ${optionalString config.modules.xdg.ssh.enable ''
+          if [[ "''${ARGS[*]}" != *"--identity"* && "''${ARGS[*]}" != *"-i"* ]]; then
+            for hostkey in "${hostKey}"; do
+              if [[ -f "$hostkey" ]]; then
+                ARGS=( --identity "$hostkey" "''${ARGS[@]}" )
+              fi
+            done
+          fi
+        ''}
+        # agenix (>= 2026-09) nags about finding secrets.nix on its own but not
+        # about being told where it is. I'm not renaming every rules file.
+        if [[ -z "''${AGENIX_RULES:-}" && -z "''${RULES:-}" && -f ./secrets.nix ]]; then
+          export AGENIX_RULES="$PWD/secrets.nix"
+        fi
+        exec ${self.inputs.agenix.packages.default}/bin/agenix "''${ARGS[@]}"
+      '')
+    ];
+
+    age = {
+      identityPaths = [ hostKey ];
+      # Anything a secrets.nix entry declares besides publicKeys and armor
+      # (agenix's fields) is forwarded to that age.secrets's submodule. Takes
+      # file, path, mode, owner, group and symlink.
+      secrets = foldl (a: b: a // b) {}
+        (map (dir: mapAttrs'
+          (n: v: nameValuePair (removeSuffix ".age" n)
+            ({ file = "${dir}/${n}"; } // removeAttrs v [ "publicKeys" "armor" ]))
+          (import "${dir}/secrets.nix"))
+          (filter (dir: pathExists "${dir}/secrets.nix")
+            config.modules.agenix.dirs));
+    };
+  };
+}

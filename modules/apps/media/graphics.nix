@@ -1,0 +1,67 @@
+# modules/apps/media/graphics.nix
+#
+# I use almost every app in the Adobe suite, both professionally and personally.
+# Sacrificing them was the hardest (and most liberating) part of my switch to
+# Linux more than a decade ago. For much of that time I've maintained a
+# dedicated Windows PC for it, but within the past few years (2021/2022), its
+# alternatives have finally (in my opinion) become viable enough for me to drop
+# the second PC.
+
+{ self, lib, config, options, pkgs, ... }:
+
+with lib;
+with self.lib;
+let cfg = config.modules.apps.media.graphics;
+in {
+  options.modules.apps.media.graphics = {
+    enable         = mkBoolOpt false;
+    tools.enable   = mkBoolOpt true;
+    raster.enable  = mkBoolOpt true;
+    vector.enable  = mkBoolOpt true;
+    sprites.enable = mkBoolOpt true;
+    design.enable  = mkBoolOpt true;
+  };
+
+  config = mkIf cfg.enable {
+    user.packages = with pkgs;
+      # CLI/scripting tools
+      (optionals cfg.tools.enable [
+        imagemagick
+        # Optimizers
+        # LOSSLESS   LOSSY
+        optipng      pngquant
+        jpegoptim    libjpeg  # (jpegtran)
+                     gifsicle
+      ]) ++
+
+      # Replaces Illustrator (maybe indesign?)
+      (optionals cfg.vector.enable [
+        inkscape
+      ]) ++
+
+      # Replaces Photoshop
+      (optionals cfg.raster.enable [
+        (gimp3-with-plugins.override {
+          plugins = with gimp3Plugins; [
+            # bimp            # batch image manipulation
+            # resynthesizer   # content-aware scaling in gimp
+            gmic            # an assortment of extra filters
+          ];
+        })
+        krita   # But Krita is better for digital illustration
+      ]) ++
+
+      # Sprite sheets & animation
+      (optionals cfg.sprites.enable [
+        pixelorama
+      ]);
+
+    # home.configFile = mkIf cfg.raster.enable {
+    #   "GIMP/3.0" = {
+    #     source = "${self.configDir}/gimp";
+    #     recursive = true;
+    #   };
+    #   # TODO Inkscape dotfiles
+    # };
+  };
+}

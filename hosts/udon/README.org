@@ -1,0 +1,80 @@
+#+TITLE: Udon
+#+DATE:  September 13, 2020
+
+* Overview
+My daily NixOS driver, for work and play. Dual-boots with Windows (used solely
+for gaming, when Proton isn't enough).
+
+* Specs
+| CASE | Fractal Design Define R4 ATX Tower Case Black Pearl |
+| CPU  | AMD Ryzen 9 3900X 12-core, 24-thread                |
+| MOBO | GIGABYTE B550 AORUS Elite                           |
+| COOL | Cooler Master Hyper 212 Evo                         |
+| RAM  | G.SKILL Ripjaws V Series 64GB (2x 32GB)             |
+| PSU  | Seasonic PRIME TX-1000                              |
+| GPU  | ASUS TUF GeForce 3080ti RTX                         |
+| HDD  | WD_BLACK 1TB SN850X NVMe                            |
+| HDD  | Samsung 970 EVO+ 500GB                              |
+| HDD  | Seagate ST1000DM010 Compute 1TB                     |
+| HDD  | WD6400AAKS 640GB                                    |
+| KBD  | ErgoDox-EZ                                          |
+| USB  | Anker Wireless Vertical Mouse                       |
+
+* Filesystems
+** /dev/nvme0n1: Samsung EVO+ 500gb (nixos, /home)
+#+begin_src sh
+parted /dev/nvme0n1 -- mklabel gpt
+parted /dev/nvme0n1 -- mkpart ESP fat32 1MiB 512MiB
+parted /dev/nvme0n1 -- mkpart primary 512MiB 200GiB
+parted /dev/nvme0n1 -- mkpart primary 200GiB 100%
+parted /dev/nvme0n1 -- set 1 boot on
+mkfs.fat -F32 -n BOOT /dev/nvme0n1p1
+mkfs.ext4 -L nixos /dev/nvme0n1p2
+mkfs.ext4 -L home /dev/nvme0n1p3
+#+end_src
+
+** /dev/nvme1n1: SN850X NVMe 1TB (windows, games) :windows:
+This is set up on the Windows side, as is my dedicated Windows + game library
+drive. On the Linux side I only need a label to consistently refer to it by:
+#+begin_src sh
+ntfslabel /dev/nvme1n1p2 windows
+#+end_src
+
+** /dev/sda: WD6400AAKS 640gb (extra storage and VMs)
+#+begin_src sh
+parted /dev/sda -- mklabel gpt
+parted /dev/sda -- mkpart primary 0% 100%
+mkfs.ext4 -L data /dev/sda1
+#+end_src
+
+** /dev/sdb: ST1000DM010 1TB (for local backups) :windows:
+#+begin_src sh
+$ ntfslabel /dev/sdb backup
+#+end_src
+
+** Mount filesystems
+The final step in the install process, before running ~/etc/dotfiles/bin/hey
+install~:
+#+BEGIN_SRC sh
+mount /dev/disk/by-label/nixos /mnt
+
+mkdir -p /mnt/{home,boot}
+mount /dev/disk/by-label/boot /mnt/boot
+mount /dev/disk/by-label/home /mnt/home
+
+mkdir -p /mnt/media/{windows,video}
+mount /dev/disk/by-label/windows /mnt/media/windows
+mount /dev/disk/by-label/video /mnt/media/video
+#+END_SRC
+
+* History
+** January 4, 2023
+Repurposed this system from a dedicated workstation to a dual purpose
+work+gaming workstation.
+
+- Renamed from Kuro to Udon.
+- Replaced EVGA GeForce 680GTX SC with ASUS TUF GeForce 3080ti RTX.
+- Added WD_BLACK 1TB SN850X M.2 drive for Windows dualbooting.
+- Added Seagate ST1000DM010 1TB for footage and video projects.
+- Added WD6400AAKS 640GB for VM storage and local redundancy.
+- Replaced PSU: Corsair RM750I -> Seasonic PRIME TX-1000.

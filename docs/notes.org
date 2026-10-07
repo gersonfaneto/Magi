@@ -1,0 +1,177 @@
+#+title: Notes
+
+* Introduction
+* Why I switched to NixOS
+** Provisioning a fleet of workstations, servers, and VMs
+**
+* Challenges
+** LD Fix
+#+begin_src nix
+programs.nix-ld = {
+  enable = true;
+  libraries = with pkgs; [
+    # Add missing dynamic libraries for missing unpacked programs here,
+    # NOT in environment.systemPackages.
+  ];
+};
+#+end_src
+** The Nix Language
+** Abandoning Adobe
+This doesn't pertain to NixOS specifically, but I came to NixOS after sampling
+Arch, Debian, Fedora, and Ubuntu for a couple months, and before that, macOS,
+which I'd happily used for a nearly a decade (and before that, everyone's
+favorite: Windows).
+
+For half of my career as a Developer, I was also a Graphic Designer, occasional
+video editor, and did most of my proposals/invoicing in InDesign, so there was a
+ton of Adobe lock-in to deal with. Finding alternatives for them has been the
+single most painful (and liberating) aspect of switching to Linux, and only
+recently (around 2022) have they become viable enough for me /not/ to maintain a dedicated Windows PC for the purpose.
+
+*** Photoshop -> Gimp + plugins, Aseprite, Krita
+- Status :: Eh, it works.
+
+Photoshop (and Illustrator) has always been the toughest act to follow on Linux.
+MacOS has some decent competitors, like Affinity Photo, but all we have is Gimp
+and Krita (plus a few honourable mentions but for more niche purposes, like
+Aseprite). Gimp comes closest, but isn't quite at "baseline" yet as an
+acceptable Photoshop replacement (for me), and its development the past few
+years have been more concerned with maintenance over the feature gap,
+unfortunately.
+
+So what's a *nixer to do? So far, here's what I've settled on:
+
+- GIMP plus these plugins/apps:
+  - [[https://github.com/bootchk/resynthesizer][Resynthesizer]] :: Content aware scaling for GIMP.
+  - [[https://gmic.eu/][G'MIC]] :: An assortment of 500+ filters.
+  - Gimp Layer Effects :: Layer effects, finally! Original source has
+    disappeared, so it lives in [[file:../config/gimp/plug-ins/layerfx.py][config/gimp/plug-ins/layerfx.py]] for now.
+  - [[https://cyan.fxarena.net/][Cyan]] :: For converting images to CYMK (with ICC color profile support).
+- Aseprite (for sprite work)
+- Krita (for raster-based digital illustration)
+- Gnome's font-manager :: A decent font manager, but it's the only game in town.
+
+Unfortunately, the type design game is still abysmal across all these options.
+Krita's a /little/ better, given that you can [[https://docs.krita.org/en/reference_manual/tools/text.html#fine-typographic-control-with-the-svg-source-tab][adjust the SVG source directly]] to
+manipulate word spacing, letter spacing, and kerning, but dipping into the text
+editor for that is pain. Where possible, I try to rely on (Desktop) Figma
+instead for this sort of thing (see the section about Adobe XD).
+
+As for sprite work, Aseprite is specialized, so it has no business /not/ being
+better at it than Photoshop ever was. And it is, so...
+
+*** Illustrator -> Inkscape, Affinity Designer (on iPad Pro)
+- Status :: Nearly perfect!
+
+The Illustrator/Inkscape gap is different from Photoshop/Gimp's -- more
+/essential/ features are missing. Or /were/. In recent years, quite a bit of
+progress was made while I wasn't looking:
+
+- [[https://inkscape.org/news/2022/05/16/inkscape-12/][1.2]] (May 16, 2022) :: Introduced artboards and batch exporting.
+- [[https://inkscape.org/news/2021/05/24/welcome-inkscape-11/][1.1]] (May 24, 2021) :: Introduced an "outline overlay" display mode, a
+  calligraphy tool for better node manipulation, object slicing a command
+  palette, and preference search.
+- [[https://inkscape.org/news/2020/05/04/introducing-inkscape-10/][1.0]] (May 4, 2020) :: Introduced HiDPI support, redesigned Live Path Effects,
+  Xray/Split-view modes, PowerPencil mode, PDF export, and more.
+
+The introduction of artboards alone has been huge for me.
+
+Pair that with Affinity Designer on my iPad pro (and the incredible Apple
+Pencil) and all my bases are covered. Besides the occasional missing feature
+here and there, I don't find myself missing Illustrator.
+
+*** Indesign -> Figma, HTML+CSS+wkhtmltopdf
+- Status :: Eh, it works.
+
+Figma is great, but not "replaces Indesign" great. My custom
+Pug+SCSS+wkhtmltopdf pipeline is very good, but hardly a solution I can
+recommend to others. The only reason this works for me is because I have 10+
+years in web development, and I had the +insanity+ enthusiasm to develop it on
+my free time (the biggest challenge being finding a decent and free HTML->PDF
+printer with a CLI).
+
+That said, there's always Scribus, which is /alright/, but so, so very clunky.
+Well, I suppose InDesign was too.
+
+*** Premiere/After Effects -> DaVinci Resolve
+- Status :: Nearly perfect!
+
+DaVinci Resolve was the final push I needed to finally drop Adobe. It is
+hands-down the best video editor on Linux, and free! There're just three
+problems:
+
+1. It's not open-source,
+2. No h.264/265 codec support on Linux (requires paid license -- albeit only once and at a reasonable price),
+3. No AAC support on Linux, with or without a paid license.
+
+I get around #2 and #3 by transcoding after recording (this is necessary in any
+case if you record to *.mkv files, which I do to support multiple audio tracks):
+
+#+begin_src bash
+# Use this to collect information about the video file, like resolution and
+# bitrate. The dnxhd codec is picky.
+ffmpeg -loglevel error -f lavfi -i testsrc2 -c:v dnxhd -f null -
+
+# To transcode all mkv files in a directory:
+for f in *.mkv; do
+    ffmpeg -y -i "$f" \
+        -stats \
+        -hide_banner \
+        -c:a pcm_s16le \
+        -map 0:a \     # all audio channels
+        # Davinci likes dnxhd (or prores) better than mpeg-4, but it will
+        # produce *huge* files!
+        -c:v dnxhd \
+        -vf "scale=2560:1440,fps=60000/1001,format=yuv422p10le" \
+        -b:v 80M \     # max bitrate; adjust as needed
+        "${f##*.}.mov"
+done
+
+# Then to later transcode it (e.g. for youtube):
+# software encoders
+#codec="libx264"
+#codec="libx265"
+# AMD hardware encoders
+#codec="h264_amf"
+#codec="hevc_amf"    # h265
+# Nvidia hardware encoders
+#codec="h264_nvenc"
+codec="hevc_nvenc"   # h265
+# Intel hardware encoders
+#codec="h264_qsv"
+#codec="hevc_qsv"    # h265
+for f in *.mov; do
+  ffmpeg -i "$f" \
+    -vf yadif \
+    -codec:v $codec -crf 1 -bf 2 -flags +cgop -pix_fmt yuv420p \
+    -codec:a aac -strict -2 -b:a 384k -r:a 48000 \
+    -movflags faststart \
+    output.mp4
+done
+#+end_src
+
+[[https://askubuntu.com/a/907515][More info about the DNxHD codec]].
+
+*** XD -> (Desktop) Figma
+- Status :: Pretty good
+
+I've used Sketch and Adobe XD a fair bit. Figma is a good middle ground. Not
+great, but not bad either. Best to use the Electron (ew) version so that it can
+see your system fonts, though.
+*** Flash/Animate -> Wick Editor
+- Status :: Nearly perfect!
+
+Flash was fantastic for 2D animation, and I'd mostly use it for cinematics in my
+indie games. Fortunately, my needs are quick simple, so the equally simple Wick
+Editor was more than good enough for my needs.
+
+* Problem
+
+* History
+** Switching to NixOS
+I switched to NixOS from Arch sometime around 2017.
+
+- Provisioning my systems :: I've tried a laundry list of approaches to automate
+  it. The usual suspects, like Ansible, Capistrano, Fabric, and Puppet, to more
+  DIY web of bash scripts. This was painful.
+- Abandoning Adobe ::

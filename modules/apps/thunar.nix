@@ -1,0 +1,20 @@
+# modules/apps/thunar.nix --- TODO
+#
+# TODO
+
+{ self, lib, config, options, pkgs, ... }:
+
+with lib;
+with self.lib;
+let cfg = config.modules.apps.thunar;
+in {
+  options.modules.apps.thunar = {
+    enable = mkBoolOpt false;
+  };
+
+  config = mkIf cfg.enable {
+    programs.thunar.enable = true;
+    # services.gvfs.enable = true; # Mount, trash, and other functionalities
+    services.tumbler.enable = true; # Thumbnail support for images
+  };
+}
