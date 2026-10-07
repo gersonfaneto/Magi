@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+# Create a notification toast.
+#
+# SYNOPSIS:
+#   magi.toast [-a NAME] [-c CATEGORY] [-i ICON] [-t MS] [-H]
+#             (info|warn|error) SUMMARY [BODY]
+#
+# DESCRIPTION:
+#   Records a notification under magi's name in magi's notification log. error
+#   is critical, the rest are normal. magi-notifyd owns the bus, so this is a
+#   plain notify-send; no-op when notify-send isn't around (a tty, another
+#   shell). Read the log with `magi notify`.
+#
+# OPTIONS:
+#   -a NAME
+#     The app the toast claims to be from. Defaults to magi.
+#   -c CATEGORY
+#     A notification category, for the shell's filters.
+#   -H
+#     Accepted and ignored. It used to send over DBus to the shell's
+#     notification service.
+#   -i ICON
+#     A glyph name or path to an image.
+#   -t MS
+#     How long the toast lingers, in milliseconds. 0 pins it until dismissed.
+
+local -a app category icon timeout keep
+zparseopts -D -- a:=app c:=category i:=icon t:=timeout H=keep
+local type=$1 summary=$2 body=$3
+local urgency=normal
+[[ $type == error ]] && urgency=critical
+
+local -a opts=(-a "${app[2]:-magi}" -u $urgency)
+# :- on every one of these: zparseopts leaves the array empty when the flag
+# is absent, and a caller with set -u dies on the subscript otherwise.
+[[ -n ${category[2]:-} ]] && opts+=(-c "${category[2]}")
+[[ -n ${icon[2]:-} ]] && opts+=(-i "${icon[2]}")
+[[ -n ${timeout[2]:-} ]] && opts+=(-t "${timeout[2]}")
+# notify-send blocks until the notification daemon answers, so detach: a
+# headless box just gets the exit status.
+magi.do -o -e notify-send notify-send $opts -- "$summary" "$body"

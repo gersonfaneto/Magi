@@ -1,0 +1,363 @@
+#compdef magi lab beval
+#
+# Almost nothing here is hardcoded. `magi help --dump [CMD]` supplies the
+# subcommand list and each command's flags and arguments, generated from the
+# OPTIONS: and ARGUMENTS: sections of its comment header, and `magi help --scan
+# DIRS` describes the scripts in a directory. Both live in lib/magi/docs.janet.
+#
+# The generic half of all that -- dumping, scanning, walking script directories,
+# the subcommand menu -- lives in lib/zsh as one autoloaded magi.comp.* function
+# apiece (see modules/magi.nix), for any other zsh script to reach. The prefix is
+# how to tell the two apart: magi.comp.* is public and anyone's to call, __magi_*
+# is defined in this file and nobody else's business.
+#
+# The other names up there are bin/lab and bin/beval, which are
+# `exec magi .NAME "$@"` and little else. Any such wrapper gets magi's completion
+# by being named on that line (or with `compdef NAME _magi`); there is no
+# per-wrapper file to write, because there is nothing to complete but what magi
+# resolves .NAME to.
+#
+# What's left here is the dynamic half of magi's dispatcher, which has to walk
+# /etc/magi (or $DOTFILES_HOME, if set):
+#
+#   magi wm|host CMD        -- scripts in {config/$WM,hosts/$HOST}/bin (and
+#                             bin/magi.d/wm.d, for wm)
+#   magi ops CMD            -- scripts in bin/magi.d/ops.d
+#   magi @FOO CMD           -- scripts in config/FOO/bin
+#   magi .FOO               -- scripts in hosts/$HOST/bin, config/$WM/bin, or bin/
+#   magi hook [@AREA] HOOK  -- hooks in the dirs info.json lists (magi.hookPaths)
+#
+# Script directories nest: a NAME.d (or NAME/) directory beside NAME is
+# descended into, exactly like lib/magi/init.janet's resolve-1.
+#
+# compinit's _comp_setup already sets extendedglob, NO_globsubst and
+# NO_shwordsplit for every completion, so nothing here needs its own setopt.
+# It also declares `local -a reply`, which is why the results below go into
+# $_magi_reply: zstyle -e assigns into the caller's $reply, so handing that name
+# to _describe risks it being clobbered out from under us.
+
+# The area DIR belongs to, left in $REPLY. Mirrors bin/magi.d/hook.janet's
+# area-of, which is what decides whether @AREA means anything.
+__magi_hook_area() {
+  local dir=${1%/}
+  if   [[ ${dir:t} != hooks ]];     then REPLY=${${dir:t}%.d}
+  elif [[ ${dir:h:h:t} == hosts ]]; then REPLY=host
+  else                                   REPLY=${dir:h:t}
+  fi
+}
+
+# The areas a hook can be scoped to. Bare after an @, sigil-prefixed otherwise,
+# so they can share a menu with the hook names.
+__magi_hook_areas() {
+  local -a areas=( $_magi_hookareas )
+  (( $#areas )) || return 1
+  compset -P '@' || areas=( ${areas/#/@} )
+  _describe -t areas 'hook area' areas
+}
+
+# With no AREA, offers every area's hooks plus the areas themselves. A handler's
+# NN- is its place in line, not its name, and several dirs can handle one hook.
+__magi_hooks() {
+  local area=${1-} dir name REPLY ret=1
+  local -a dirs _magi_reply
+  local -A seen
+
+  [[ -z $area && $PREFIX == @* ]] && { __magi_hook_areas; return }
+
+  for dir in $_magi_hookdirs; do
+    __magi_hook_area $dir
+    [[ -z $area || $REPLY == $area ]] && dirs+=( $dir )
+  done
+  if magi.comp.scan $dirs; then
+    for name in ${_magi_reply/#<->-/}; do
+      (( $+seen[${name%%:*}] )) || seen[${name%%:*}]=$name
+    done
+    _magi_reply=( ${(v)seen} )
+  fi
+
+  (( $#_magi_reply )) && { _describe -t hooks 'hook' _magi_reply && ret=0 }
+  [[ -n $area ]] || { __magi_hook_areas && ret=0 }
+  return ret
+}
+
+# hook takes an optional leading @AREA, which _arguments has no way to express
+# as a positional. When position 1 swallowed one, the hook name lands here
+# instead, as the first of the rest arguments.
+__magi_hook_arg() {
+  if [[ $CURRENT == 1 && $line[1] == @?* ]]; then
+    __magi_hooks ${line[1]#@}
+  else
+    _default
+  fi
+}
+
+__magi_path_segment() {
+  if [[ $line[1] == xdg ]]; then
+    local expl
+    _wanted directories expl 'XDG directory' \
+      compadd bin config data cache state runtime fake
+  else
+    _files
+  fi
+}
+
+# One hitch: the stock _ssh_hosts completer can't deal with the PATH component
+# in [user@]host[:PATH], so I gotta reinvent this wheel out of wheels
+# that, fortunately, already exist (_remote_files, which _ssh uses).
+#
+# Turn it off with `zstyle ':completion:*:*:magi:*:files' remote-access false` if
+# you don't like it. The directories-only syntax (-/) won't work here though.
+__magi_ssh_target() {
+  compset -P 1 '*:' && { _remote_files -- ssh; return }
+  compset -P '*@'
+  _hosts -qS:
+}
+
+# The host half of the above, for the commands that take somewhere to ssh to
+# and no path to put things at (config/*/bin/infect.zsh).
+__magi_ssh_host() {
+  compset -P '*@'
+  _hosts
+}
+
+# magi ops edit takes SYSTEM:FILE. I know the systems. The files are on a
+# machine I am not about to hang a TAB on an ssh round trip to, so past the
+# colon I have nothing to say and say it.
+__magi_edit_target() {
+  compset -P '*:' && return 1
+  magi.comp.hosts ':'
+}
+
+__magi_generations() {
+  local expl
+  local -a gens=( /nix/var/nix/profiles/system-*-link(N:t:s/system-//:s/-link//) )
+  (( $#gens )) && _wanted generations expl 'generation' compadd -o numeric -a gens
+}
+
+__magi_inputs() {
+  local expl
+  local -a inputs
+  (( $+commands[jq] )) && [[ -r $_magi_root/flake.lock ]] &&
+    inputs=( ${(f)"$(jq -r '.nodes.root.inputs | keys[]' -- $_magi_root/flake.lock 2>/dev/null)"} )
+  (( $#inputs )) && _wanted inputs expl 'flake input' compadd -a inputs
+}
+
+# The Janet suites, named as bin/magi.d/test.janet's magi-suites names them: the
+# path under test/, minus the .nix, with test/nixos and anything _-prefixed left
+# out of it.
+__magi_magi_suites() {
+  local expl root=$_magi_root/test
+  local -a suites=( $root/*/*.janet(N.) )
+  suites=( ${${suites#$root/}%.janet} )
+  suites=( ${suites:#(nixos|_*)/*} )
+  suites=( ${suites:#*/_*} )
+  (( $#suites )) && _wanted suites expl 'magi suite' compadd -a suites
+}
+
+# The NixOS suites, named as test/nixos/_lib.nix's collectSuites names them: the
+# path under test/nixos, minus the .nix, with "/" turned into "-". Read off the
+# filesystem, not from `magi test -l`, which evaluates the flake twice and is far
+# too slow to hang a TAB on.
+__magi_test_suites() {
+  local expl root=$_magi_root/test/nixos
+  local -a files suites
+  files=( $root/**/*.nix(N.) )
+  files=( ${files#$root/} )
+  # collectSuites skips _private paths, NAME.d directories, and the default.nix
+  # a directory is entered through.
+  files=( ${files:#(*/|)(_*|default.nix)} )
+  files=( ${files:#*.d/*} )
+  suites=( ${${files%.nix}//\//-} )
+  (( $#suites )) && _wanted suites expl 'nixos suite' compadd -a suites
+}
+
+# magi theme's first word is the subcommand; only bg and apps take a value,
+# and each has its own set. The rest have nothing to say.
+__magi_theme_arg() {
+  case $line[1] in
+    (bg) (( $#line > 2 )) || _wanted backgrounds expl 'background' compadd light dark ;;
+    (apps) (( $#line > 2 )) || _wanted app-themes expl 'app theme' compadd on off ;;
+    (status|apply|render|check) return 1 ;;
+    (*) _wanted theme-commands expl 'theme command' compadd status bg apply render check apps ;;
+  esac
+}
+
+__magi_info_keys() {
+  local -a keys
+  (( $+commands[jq] )) && [[ -r $_magi_datadir/info.json ]] &&
+    keys=( ${(f)"$(jq -r 'keys[]' -- $_magi_datadir/info.json 2>/dev/null)"} )
+  _alternative \
+    'queries:query:((ip:"print this machine'"'"'s IP address"))' \
+    'keys:info key:compadd -a keys'
+}
+
+__magi_vars() {
+  local expl dir
+  if (( $+opt_args[-g] )); then
+    dir=$_magi_datadir/vars.d
+  else
+    dir=${XDG_RUNTIME_DIR:-/run/user/$UID}/magi/vars.d
+  fi
+  local -a vars=( $dir/*(N.:t) )
+  (( $#vars )) && _wanted vars expl 'variable' compadd -a vars
+}
+
+__magi_image_variants() {
+  local expl
+  local -a variants=(
+    amazon azure cloudstack digital-ocean google-compute hyperv
+    iso iso-installer kexec kubevirt linode lxc lxc-metadata
+    oci openstack openstack-zfs proxmox proxmox-lxc
+    qemu qemu-efi raw raw-efi sd-card vagrant-virtualbox virtualbox vmware
+  )
+  _wanted variants expl 'image variant' compadd -a variants
+}
+
+__magi_sync_arg() {
+  case $line[1] in
+    (rollback) __magi_generations ;;
+    (build-image) (( $#line > 2 )) || __magi_image_variants ;;
+    (*) _default ;;
+  esac
+}
+__magi_profile_arg() { [[ $line[1] == (rm|diff) ]] && { __magi_generations; return }; return 1 }
+
+# `test nixos SUITE` takes a single suite name; `test magi ARGS` passes its
+# arguments to judge, which takes suite names or test files.
+__magi_test_arg() {
+  case $line[1] in
+    (nix|nixos) (( $#line > 2 )) || __magi_test_suites ;;
+    (magi) __magi_magi_suites; _files ;;
+    (*) return 1 ;;
+  esac
+}
+
+# For scripts that forward to a cobra CLI (docker, kubectl, gh, ...), which
+# answer their own completion through a hidden `__complete ARGS... PREFIX`:
+# `value<TAB>desc` lines, then a `:BITS` directive. Asking the script rather
+# than the program means it gets asked wherever the script sends it, e.g. over
+# ssh. By path, not through magi, which would eat any -h on the line.
+__magi_cobra() {
+  local script=${$(command $_magi_bin which $_magi_leaf 2>/dev/null)%%[[:space:]]#}
+  [[ -x $script ]] || return 1
+  local -a out opts
+  out=( ${(f)"$($script __complete "${(@)words[1,CURRENT-1]}" "$PREFIX" 2>/dev/null)"} )
+  [[ $out[-1] == :<-> ]] || return 1
+  local -i bits=${out[-1]#:}
+  out[-1]=()
+  (( bits & 1 )) && return 1
+  (( bits & 2 )) && opts=( -S '' )
+  # Cobra's [ActiveHelp] lines aren't candidates.
+  out=( ${out:#_activeHelp_*} )
+  if (( $#out )); then
+    local -a _magi_reply
+    local l v
+    # _describe splits on the first colon, and docker has plenty (image:tag).
+    for l in $out; do
+      v=${${l%%$'\t'*}//:/\\:}
+      [[ $l == *$'\t'* ]] && v+=:${l#*$'\t'}
+      _magi_reply+=( $v )
+    done
+    _describe -t cobra 'argument' _magi_reply "${(@)opts}"
+  elif (( ! (bits & 4) )); then
+    _default
+  else
+    return 1
+  fi
+}
+
+# magi's dispatch rules that aren't "read the subcommand's header". Exit 2 hands
+# the word back to magi.comp.dispatch, which does exactly that; every other status
+# is an answer, even an empty one.
+__magi_rules() {
+  case $words[1] in
+    # Paths are executed verbatim. This must precede (.*), which would
+    # otherwise claim ./foo and search for a script named /foo.
+    (./*|/*) _default ;;
+
+    # These dispatch into a directory of scripts instead of taking arguments of
+    # their own, so there is no header of their own to read.
+    (host)  magi.comp.subdir $_magi_root/hosts/$_magi_host/bin ;;
+    # magi wm's compiled commands come first, and shadow a script of the same
+    # name, the way bin/magi.d/wm.janet's table does.
+    (wm)    magi.comp.subdir $_magi_root/bin/magi.d/wm.d ${_magi_wm:+$_magi_root/config/$_magi_wm/bin} ;;
+    (@*)    magi.comp.subdir $_magi_root/config/${words[1]#@}/bin ;;
+    (ops)   magi.comp.subdir $_magi_root/bin/magi.d/ops.d ;;
+    (.*)
+      local _magi_sigil=.
+      words[1]=${words[1]#.}
+      magi.comp.scriptdir $_magi_bindirs
+      ;;
+
+    # Dispatch rules with no script of their own to read a header from. bin/magi
+    # maps get/set to a lambda with no file, so --dump has nothing to emit.
+    (exec)
+      _arguments -C \
+        '1:command:_command_names -e' \
+        '*:: :_default'
+      ;;
+    (get|set)
+      _arguments -C \
+        '-g[read or write a persistent (global) var]' \
+        '1: :__magi_vars'
+      ;;
+
+    (*) return 2 ;;
+  esac
+}
+
+_magi() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+  local -a globals _magi_reply
+  local _magi_bin=magi
+
+  # `magi` resolves these internally (see lib/magi/lib.janet)
+  local _magi_root=${DOTFILES_HOME:-/etc/magi}
+  local _magi_host=$HOST
+  local _magi_wm=${${(M)${(L)XDG_CURRENT_DESKTOP}:#*hyprland*}:+hypr}
+  local _magi_datadir=${XDG_DATA_HOME:-$HOME/.local/share}/magi
+  # An unset $_magi_wm would collapse config/$_magi_wm/bin to config/bin, so it
+  # has to drop out of the list entirely.
+  local -a _magi_bindirs=(
+    $_magi_root/hosts/$_magi_host/bin
+    ${_magi_wm:+$_magi_root/config/$_magi_wm/bin}
+    $_magi_root/bin
+  )
+  local -a _magi_cfgdirs=( $_magi_root/config/*/bin(N-/:h:t) )
+  # Only what this host enables, courtesy of magi.hookPaths (see modules/magi.nix).
+  local -a _magi_hookdirs _magi_hookareas
+  (( $+commands[jq] )) &&
+    _magi_hookdirs=( ${(f)"$(jq -r '.hooks[]?' $_magi_datadir/info.json 2>/dev/null)"} )
+  local REPLY dir
+  for dir in $_magi_hookdirs; do
+    __magi_hook_area $dir
+    _magi_hookareas+=( $REPLY )
+  done
+  _magi_hookareas=( ${(u)_magi_hookareas} )
+
+  # Anything else this is compdef'd onto is a `magi .NAME "$@"` wrapper, so hand
+  # the line to the .* rule and let it walk. $service rather than $words[1],
+  # which is whatever spelling of the command I happened to type.
+  if [[ $service != magi ]]; then
+    local _magi_sigil=.
+    words[1]=$service
+    magi.comp.scriptdir $_magi_bindirs
+    return
+  fi
+
+  # magi's own flags come from bin/magi's header, like every other command's. By
+  # absolute path, not `.magi`, which would resolve through the search path and
+  # let a script named `magi` in an earlier bin/ shadow it.
+  magi.comp.dump $_magi_root/bin/magi && globals=( $_magi_reply )
+
+  _arguments -C -A '-*' \
+    $globals \
+    '1: :magi.comp.commands' \
+    '*:: :->args' && return 0
+
+  [[ $state == args ]] || return 1
+  magi.comp.dispatch
+}
+
+_magi "$@"

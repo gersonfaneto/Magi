@@ -1,0 +1,11 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+#
+# Source: https://askubuntu.com/questions/645/how-do-you-reset-a-usb-device-from-the-command-line
+# @Tamás Tapsonyi
+
+for i in /sys/bus/pci/drivers/[uoex]hci_hcd/*:*(N); do
+  [[ -e $i ]] || continue
+  print -r -- "${i##*/}" >"${i%/*}/unbind"
+  print -r -- "${i##*/}" >"${i%/*}/bind"
+done

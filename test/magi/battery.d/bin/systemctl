@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+# Log power actions instead of taking them.
+print -r -- "systemctl $*" >>${MAGI_TEST_LOG:?}
+exit 0

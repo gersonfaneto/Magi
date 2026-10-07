@@ -1,0 +1,55 @@
+#!/bin/sh
+# Stub rbw for test/magi/rbw.janet.
+[ -n "$RBW_TEST_LOG" ] && printf '%s\n' "$*" >> "$RBW_TEST_LOG"
+case "$1" in
+  list)
+    cat <<'JSON'
+[{"id":"id-1","name":"Example","user":"me@example.com","folder":null,"uris":["https://example.com/"],"type":"Login"}]
+JSON
+    ;;
+  get)
+    if [ "$2" = "--list-fields" ]; then
+      printf 'username\nuris\npassword\nnotes\nmy-custom-field\n'
+    elif [ "$2" = "--field" ]; then
+      case "$3" in
+        notes) printf 'old notes\n' ;;
+        *) printf 'secret-value\n' ;;
+      esac
+    fi
+    ;;
+  generate)
+    printf 'generated-secret\n'
+    ;;
+  add)
+    if [ -n "$RBW_TEST_ADD_FILE" ]; then
+      tmp=$(mktemp)
+      "$EDITOR" "$tmp"
+      cp "$tmp" "$RBW_TEST_ADD_FILE"
+      rm -f "$tmp"
+    fi
+    ;;
+  edit)
+    if [ -n "$RBW_TEST_EDIT_FILE" ]; then
+      tmp=$(mktemp)
+      "$EDITOR" "$tmp"
+      cp "$tmp" "$RBW_TEST_EDIT_FILE"
+      rm -f "$tmp"
+    fi
+    ;;
+  unlocked)
+    if [ -n "$RBW_TEST_LOCKED" ] && [ -e "$RBW_TEST_LOCKED" ]; then
+      exit 1
+    fi
+    ;;
+  unlock)
+    [ -n "$RBW_TEST_LOCKED" ] && rm -f "$RBW_TEST_LOCKED"
+    ;;
+  remove)
+    ;;
+  sync)
+    if [ -n "$RBW_TEST_SYNC_FAIL" ]; then
+      printf 'sync failed\n' >&2
+      exit 1
+    fi
+    ;;
+esac

@@ -1,0 +1,131 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Download audio from YouTube playlists or individual videos (via yt-dlp).
+
+# set -x # WARN: Only used for debugging...
+set -euo pipefail
+
+local program=${0:t}
+
+COLOR_RESET='\033[0m'
+COLOR_RED='\033[0;31m'
+COLOR_GREEN='\033[0;32m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_BLUE='\033[0;34m'
+COLOR_CYAN='\033[0;36m'
+
+die() {
+  printf "[${COLOR_RED}ERROR${COLOR_RESET}]: %s\n" "$1" >&2
+  exit 1
+}
+
+has() {
+  command -v "$1" >/dev/null 2>&1 || die "Missing dependency: $1"
+}
+
+usage() {
+  echo -e "${COLOR_CYAN}Usage:${COLOR_RESET} $program [OPTIONS] [URL1 URL2 ... | --batch-file FILE | --edit-links]"
+  echo ""
+  echo -e "${COLOR_CYAN}Description:${COLOR_RESET}"
+  echo "  Downloads audio from YouTube playlists or individual videos."
+  echo ""
+  echo -e "${COLOR_CYAN}Options:${COLOR_RESET}"
+  echo -e "  ${COLOR_GREEN}-e, --edit-links${COLOR_RESET}       Open an editor to paste/write links interactively."
+  echo -e "  ${COLOR_GREEN}-h, --help${COLOR_RESET}             Display this help message and exit."
+  echo ""
+  echo -e "${COLOR_CYAN}Arguments:${COLOR_RESET}"
+  echo "  URL1 URL2 ...          One or more direct URLs to download."
+  echo "  --batch-file FILE      Specify a file containing a list of URLs, one per line."
+  echo ""
+  echo -e "${COLOR_CYAN}Examples:${COLOR_RESET}"
+  echo "  $program https://www.youtube.com/playlist?list=..."
+  echo "  $program --batch-file links.txt"
+  echo "  $program -e"
+  echo ""
+  echo -e "${COLOR_CYAN}Environment Variables:${COLOR_RESET}"
+  echo "  BROWSER                The browser to use for cookies (default: zen)."
+  echo "  EDITOR                 The editor to use for --edit-links (default: neovim)."
+}
+
+main() {
+  local urls_file=""
+  local use_editor=false
+  local direct_urls=() # Array to store direct URLs
+
+  # Parse options
+  while (( $# > 0 )); do
+    case "$1" in
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      -e | --edit-links)
+        use_editor=true
+        shift # Remove the flag from arguments
+        ;;
+      --batch-file)
+        if [[ -n "$2" && -f "$2" ]]; then
+          urls_file="$2"
+          shift 2 # Remove --batch-file and the filename
+        else
+          die "--batch-file requires a valid file path."
+        fi
+        ;;
+      *)
+        # If it's not an option, assume it's a URL
+        direct_urls+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  # If --edit-links was used, open the editor
+  if [[ "$use_editor" = true ]]; then
+    # Create a temporary file
+    urls_file=$(mktemp)
+    # Open the editor
+    "${EDITOR:-nvim}" "$urls_file" # Use $EDITOR, fallback to vim
+    # Check if the file has content after editing
+    if [[ ! -s "$urls_file" ]]; then
+      rm "$urls_file" # Clean up temporary file
+      die "No links provided. Exiting."
+    fi
+  fi
+
+  # Check if any links were provided (either via file, editor, or direct arguments)
+  if [[ -z "$urls_file" && ${#direct_urls[@]} -eq 0 ]]; then
+    die "No links provided. Use --help for usage information."
+  fi
+
+  # Construct the yt-dlp command
+  local yt_dlp_cmd=(
+    yt-dlp
+    --extract-audio
+    --audio-format mp3
+    --embed-thumbnail
+    --embed-metadata
+    --no-mtime
+    --no-embed-chapters
+    --no-embed-info-json
+    # --cookies-from-browser "${BROWSER:-zen}"
+    --output "%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s"
+  )
+
+  # Add the batch file argument if we have one
+  if [[ -n "$urls_file" ]]; then
+    yt_dlp_cmd+=(--batch-file "$urls_file")
+  fi
+
+  # Add any direct URL arguments
+  yt_dlp_cmd+=("${direct_urls[@]}")
+
+  # Execute the command
+  "${yt_dlp_cmd[@]}"
+
+  # Clean up the temporary file if it was created
+  if [[ "$use_editor" = true ]]; then
+    rm "$urls_file"
+  fi
+}
+
+main "$@"

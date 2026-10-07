@@ -1,0 +1,13 @@
+#!/usr/bin/env zsh
+# Stand-in for UPower's D-Bus property reads, for test/magi/battery.janet.
+# Environment selects the sample; the last argument is the property name.
+case ${@[-1]} in
+  IsPresent)    print -r -- "{\"type\":\"b\",\"data\":${BATTERY_PRESENT:-true}}" ;;
+  State)        print -r -- "{\"type\":\"u\",\"data\":${BATTERY_STATE:-2}}" ;;
+  Percentage)   print -r -- "{\"type\":\"d\",\"data\":${BATTERY_PCT:-50}}" ;;
+  TimeToEmpty)  print -r -- "{\"type\":\"x\",\"data\":${BATTERY_TIME:-0}}" ;;
+  TimeToFull)   print -r -- '{"type":"x","data":0}' ;;
+  EnergyRate)   print -r -- '{"type":"d","data":0}' ;;
+  WarningLevel) print -r -- '{"type":"u","data":1}' ;;
+  *)            print -r -- '{"type":"u","data":0}' ;;
+esac

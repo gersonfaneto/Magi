@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+
+magi.error "$@"
+exit 1

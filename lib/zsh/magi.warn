@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+
+[[ $MAGIQUIET ]] && return
+magi.echo -p "⚠ " -c yellow -- "$@" >&2

@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Re-apply the mono palette to every consumer.
+#
+# theme.py is idempotent: it rewrites only changed outputs, then pushes the
+# terminal palette into live foot/nvim sessions and the desktop palette into
+# the app theme.
+
+if ! command -v magi >/dev/null 2>&1; then
+  print -u2 "Error: 'magi' not found"
+  return 1
+fi
+
+magi theme apply

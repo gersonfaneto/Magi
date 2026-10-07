@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stub $EDITOR: puts the next queued input into the file it is handed.
+n=$(cat "$RBW_TEST_COUNTER" 2>/dev/null || printf '0')
+n=$((n + 1))
+printf '%s' "$n" >"$RBW_TEST_COUNTER"
+cat "$RBW_TEST_INPUT_DIR/$n" >"$1" 2>/dev/null
