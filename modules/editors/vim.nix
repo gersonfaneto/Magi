@@ -62,8 +62,9 @@ in {
       bash-language-server
       lua-language-server
       efm-langserver
+      nil
       nixd
-      nixfmt
+      alejandra
       statix
       deadnix
       jq # deadnix JSON -> efm via jq (also used by terraform validate)

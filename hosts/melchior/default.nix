@@ -35,7 +35,7 @@ with builtins; {
 
     wm = {
       desktop = "hyprland";
-      theme.fonts.mono = "ProFont IIx Nerd Font Mono";
+      theme.fonts.mono = "Departure Mono";
       plymouth = {
         enable = true;
         seamless = true;
@@ -70,6 +70,8 @@ with builtins; {
       rofi.enable = true;
       steam.enable = true;
       thunar.enable = true;
+      
+      libreoffice.enable = true;
 
       browsers.default = "chromium";
       browsers.chromium.enable = true;
@@ -88,6 +90,7 @@ with builtins; {
     editors = {
       default = "nvim";
       vim.enable = true;
+      emacs.enable = false;
     };
     shell = {
       direnv.enable = true;
@@ -109,7 +112,10 @@ with builtins; {
 
   ## Local config
   config = {pkgs, ...}: {
-    modules.wm.theme.fonts.extraPackages = with pkgs; [nerd-fonts.profont];
+    modules.wm.theme.fonts.extraPackages = with pkgs; [
+      departure-mono
+      nerd-fonts.departure-mono
+    ];
 
     console.keyMap = "br-abnt2";
 

@@ -137,6 +137,16 @@ if (( $+commands[aspell] && $+commands[fzf] )); then
   bindkey -M viins '^x^k' spell-complete
 fi
 
+# Universal clipboard in vi mode: zsh yanks otherwise die in $CUTBUFFER, which
+# foot (and SUPER+c) can't see -- there is no terminal selection, only zle
+# internals. The plugin syncs every yank path (visual y, Y, yy, y+motion)
+# through wl-copy once ZVM_SYSTEM_CLIPBOARD_ENABLED is set (see .zshrc); `p`
+# keeps its cutbuffer semantics, `gp`/`gP` paste from the system clipboard,
+# and SUPER+v arrives as a bracketed paste in every keymap.
+# Bracketed paste is bound in vicmd by default, but re-affirm it: zsh-vi-mode
+# rebuilds keymaps and must not lose paste in normal mode.
+bindkey -M vicmd '\e[200~' bracketed-paste
+
 # Vim's C-x C-l in zsh
 history-beginning-search-backward-then-append() {
   zle history-beginning-search-backward

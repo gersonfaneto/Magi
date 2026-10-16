@@ -318,15 +318,21 @@ hl.bind('SUPER + Escape', function() -- reset
   hl.exec_cmd('noctalia msg notification-clear-active')
 end)
 
+-- ** Universal clipboard (Omarchy-style)
+hl.bind('SUPER + c', hey.dsp.send_key('CTRL', 'Insert'))
+hl.bind('SUPER + v', hey.dsp.send_key('SHIFT', 'Insert'))
+hl.bind('SUPER + x', hey.dsp.send_key('CTRL', 'X'))
+hl.bind('SUPER + CTRL + v', hl.dsp.exec_cmd('hey @rofi clipmenu'))
+
 -- ** External tools
-hl.bind('SUPER + c', hl.dsp.exec_cmd('hey @rofi calcmenu'))
+hl.bind('SUPER + SHIFT + c', hl.dsp.exec_cmd('hey @rofi calcmenu'))
 hl.bind(
   'SUPER + e',
   hl.dsp.exec_cmd([[emacsclient --eval "(emacs-everywhere)"]])
 )
 hl.bind('SUPER + d', hl.dsp.exec_cmd('noctalia msg annotate'))
 hl.bind('SUPER + w', hl.dsp.exec_cmd('noctalia msg window-switcher hold'))
-hl.bind('SUPER + x', hl.dsp.exec_cmd('hey .ocr region'))
+hl.bind('SUPER + SHIFT + x', hl.dsp.exec_cmd('hey .ocr region'))
 hl.bind('Print', hl.dsp.exec_cmd('noctalia msg screenshot-region'))
 hl.bind('SUPER + Print', hl.dsp.exec_cmd('hey .screencast webm region 3'))
 hl.bind(

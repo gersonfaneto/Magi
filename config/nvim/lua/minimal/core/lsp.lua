@@ -107,6 +107,15 @@ do
   local lsp_autostop_pending
   local lsp_autostop_timeout_ms = 60000
 
+  -- Nix servers pay a steep (re)start cost: nixd indexes nixpkgs
+  -- (~200-300MB, ~20s cold) for package/option completion. Keep them
+  -- attached even with no nix buffers so returning to a nix file stays
+  -- instant instead of reindexing.
+  local keep_warm = {
+    nixd = true,
+    ['nil'] = true,
+  }
+
   vim.api.nvim_create_autocmd('LspDetach', {
     group = vim.api.nvim_create_augroup('minimal.lsp.auto_stop', {}),
     desc = 'Automatically stop detached language servers.',
@@ -118,7 +127,10 @@ do
       vim.defer_fn(function()
         lsp_autostop_pending = nil
         for _, client in ipairs(vim.lsp.get_clients()) do
-          if vim.tbl_isempty(client.attached_buffers) then
+          if
+            not keep_warm[client.name]
+            and vim.tbl_isempty(client.attached_buffers)
+          then
             lsp.soft_stop(client)
           end
         end
