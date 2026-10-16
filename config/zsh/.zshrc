@@ -81,10 +81,6 @@ if [[ $TERM != dumb ]]; then
   export ZVM_INIT_MODE=sourcing
   export ZVM_VI_ESCAPE_BINDKEY=^G
   export ZVM_LINE_INIT_MODE=i
-  # Sync every vi yank (visual y, Y, yy, y+motion) onto the system clipboard
-  # via wl-copy (auto-detected): the universal clipboard's SUPER+c half. Paste
-  # stays SUPER+v (foot-level bracketed paste) plus the plugin's gp/gP.
-  export ZVM_SYSTEM_CLIPBOARD_ENABLED=true
   # zsh-autosuggest
   export ZSH_AUTOSUGGEST_MANUAL_REBIND=1
 

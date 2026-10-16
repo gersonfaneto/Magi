@@ -65,7 +65,6 @@ in {
       user.packages = with pkgs; [
         rofiPkg
         rofimoji
-        cliphist # for `hey @rofi clipmenu` (clipboard history)
         (mkLauncherEntry "Calculator" {
           icon = "calc";
           exec = "hey @rofi calcmenu";
@@ -96,24 +95,7 @@ in {
           icon = "system-shutdown";
           exec = "hey @rofi powermenu";
         })
-        (mkLauncherEntry "Clipboard History ->" {
-          icon = "edit-paste";
-          exec = "hey @rofi clipmenu";
-        })
       ];
-
-      # Feeds the clipboard history `hey @rofi clipmenu` browses. wl-clipboard
-      # itself comes from modules/wm/hyprland.
-      systemd.user.services.cliphist = {
-        description = "Clipboard history database";
-        wantedBy = ["graphical-session.target"];
-        partOf = ["graphical-session.target"];
-        after = ["graphical-session.target"];
-        serviceConfig = {
-          ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
-          Restart = "on-failure";
-        };
-      };
     }
 
     (mkIf config.hardware.bluetooth.enable {
