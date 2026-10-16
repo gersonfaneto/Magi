@@ -20,5 +20,9 @@ in {
       libreoffice
       (aspellWithDicts (ds: with ds; [en]))
     ];
+
+    fonts.packages = with pkgs; [
+      corefonts
+    ];
   };
 }
