@@ -38,6 +38,10 @@
       "rev": "99848daf801789dbebe2192b475eb887d375002c",
       "src": "https://github.com/HakonHarnes/img-clip.nvim"
     },
+    "janet.vim": {
+      "rev": "28135b2418d7da0fa4bea48db5ec112cf3fbf58d",
+      "src": "https://github.com/janet-lang/janet.vim"
+    },
     "markdown-preview.nvim": {
       "rev": "a923f5fc5ba36a3b17e289dc35dc17f66d0548ee",
       "src": "https://github.com/iamcco/markdown-preview.nvim"

@@ -19,6 +19,9 @@
 /config/rofi/themes/fonts.rasi
 /config/rofi/themes/colors.rasi
 
+# Local plugin install artifacts (npm), not part of the dotfiles tree.
+/config/opencode/node_modules
+
 # Hosts are a whitelist: only melchior is tracked. Scaffold new ones with
 # `nix run .#install` (see hosts/README.md) and commit them when they're
 # worth keeping.
