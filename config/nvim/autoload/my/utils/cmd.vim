@@ -5,7 +5,7 @@
 " param: notify boolean? notify when python3 provider or the `shlex` package
 "        is unavailable, default `true`
 " return: string[]
-function! my#utils#cmd#split(str, ...) abort
+function! minimal#utils#cmd#split(str, ...) abort
   let notify = get(a:, 1, v:false)
 
   " Python3 provider is lazy-loaded, see `lua/minimal/core/opts.lua`, so first try

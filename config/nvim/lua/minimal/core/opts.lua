@@ -1,5 +1,5 @@
 vim.g.has_ui = #vim.api.nvim_list_uis() > 0
-vim.g.has_nf = vim.env.TERM ~= 'linux' and vim.env.NVIM_NF ~= nil or true
+vim.g.has_nf = vim.env.TERM ~= 'linux' and vim.env.NVIM_NF ~= nil
 
 vim.opt.exrc = true
 vim.opt.confirm = true

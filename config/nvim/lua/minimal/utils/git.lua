@@ -84,10 +84,7 @@ function M.execute(buf, args)
     return
   end
 
-  local clean_args = vim.tbl_filter(function(v)
-    return v ~= nil
-  end, args)
-  local cache_key = vim.fn.sha256(table.concat(clean_args)):sub(1, 8)
+  local cache_key = vim.fn.sha256(table.concat(args)):sub(1, 8)
   local cache_key_writetick = cache_key .. '_writetick'
 
   if
@@ -119,9 +116,21 @@ function M.execute(buf, args)
   return vim.b[buf][cache_key]
 end
 
+---Git args for files outside a regular repo, e.g. dotfiles linked from a bare
+---repo. Returns an empty list when `$DOT_DIR` is unset, so callers never build
+---argument lists containing nils.
+---@return string[][]
+function M.fallback_args()
+  if not vim.env.DOT_DIR or vim.env.DOT_DIR == '' then
+    return {}
+  end
+
+  return { { '--git-dir', vim.env.DOT_DIR, '--work-tree', vim.env.HOME } }
+end
+
 ---Get buffer's current work tree and git dir with fallback
 ---@param buf integer? buffer handler, default to current buffer
----@param fallback_args string[][] alternative git arguments to try
+---@param fallback_args string[][]? alternative git arguments to try
 ---@return string? work_tree
 ---@return string? git_dir
 function M.resolve_context(buf, fallback_args)
@@ -129,6 +138,8 @@ function M.resolve_context(buf, fallback_args)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
+
+  fallback_args = fallback_args or M.fallback_args()
 
   local work_tree = M.execute(buf, { 'rev-parse', '--show-toplevel' })
   for _, args in ipairs(fallback_args) do

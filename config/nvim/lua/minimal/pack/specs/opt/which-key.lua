@@ -122,7 +122,6 @@ return {
       })
 
       wk.add({
-        { '<Tab>', group = 'Tab' },
         { 'gs', group = 'Text split/swap' },
         { 'gq', group = 'Format' },
         { 'gr', group = 'LSP' },

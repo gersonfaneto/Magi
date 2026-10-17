@@ -38,22 +38,37 @@ return {
       'DDelete',
     },
     keys = {
-      -- stylua: ignore start
       { lhs = '<Leader>gg', opts = { desc = 'Git summary' } },
       { lhs = '<Leader>gw', opts = { desc = 'Git show latest commit' } },
       { lhs = '<Leader>gb', opts = { desc = 'Git list local branches' } },
       { lhs = '<Leader>gc', opts = { desc = 'Git commit' } },
       { lhs = '<Leader>gP', opts = { desc = 'Git push' } },
-      { lhs = '<Leader>g.', opts = { desc = 'Open repo URL in browser' } },
-      { lhs = '<Leader>gL', opts = { desc = 'Git log entire repo' } },
-      { lhs = '<Leader>g<Space>', opts = { desc = 'Populate cmdline with ":Git"' } },
-      -- stylua: ignore end
+      {
+        lhs = '<Leader>gL',
+        opts = { desc = 'Git log entire repo' },
+      },
+      {
+        lhs = '<Leader>g<Space>',
+        opts = { desc = 'Populate cmdline with ":Git"' },
+      },
     },
     events = { 'BufNew', 'BufWritePost', 'BufReadPre' },
     deps = {
       -- Enable :GBrowse command in GitHub/Gitlab repos
       'https://github.com/tpope/vim-rhubarb',
-      'https://github.com/shumphrey/fugitive-gitlab.vim',
+      {
+        src = 'https://github.com/shumphrey/fugitive-gitlab.vim',
+        data = {
+          postload = function()
+            -- Alibaba's GitLab-compatible service uses a different web host and
+            -- omits the `/-/` component found in current GitLab URLs.
+            vim.g.fugitive_gitlab_domains = {
+              ['gitlab.alibaba-inc.com'] = 'https://code.alibaba-inc.com',
+            }
+            vim.g.fugitive_gitlab_oldstyle_urls = true
+          end,
+        },
+      },
     },
     postload = function()
       vim.cmd([[
@@ -173,6 +188,15 @@ return {
             end
             init = first + 1
           end
+        end
+
+        -- A plain `git branch` line has no target besides its ref. Treat the
+        -- whole line as that ref, including the worktree marker and indent.
+        -- Verbose branch output still requires the cursor to select either
+        -- the ref above or another object such as its commit below.
+        local line_ref = line:match('^[*+ ]%s*(%S+)%s*$')
+        if line_ref and candidates[line_ref] then
+          return line_ref
         end
       end
 
@@ -349,7 +373,6 @@ return {
       vim.keymap.set('n', '<Leader>gb',       '<Cmd>Git branch<CR><Cmd>call search("^*")<CR>', { desc = 'Git list local branches' })
       vim.keymap.set('n', '<Leader>gc',       '<Cmd>Git commit<CR>',                           { desc = 'Git commit' })
       vim.keymap.set('n', '<Leader>gP',       '<Cmd>Git push<CR>',                             { desc = 'Git push' })
-      vim.keymap.set('n', '<Leader>g.',       '<Cmd>GBrowse<CR>',                              { desc = 'Open repo URL in browser' })
       vim.keymap.set('n', '<Leader>gD',       '<Cmd>Git diff<CR>',                             { desc = 'Git diff entire repo' })
       vim.keymap.set('n', '<Leader>gB',       '<Cmd>Git blame<CR>',                            { desc = 'Git blame current file' })
       vim.keymap.set('n', '<Leader>gl',       '<Cmd>Git log -100 --oneline --follow -- %<CR>', { desc = 'Git log current file' })

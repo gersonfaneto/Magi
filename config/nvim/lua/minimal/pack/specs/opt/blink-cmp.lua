@@ -27,7 +27,7 @@ return {
       local icons = require('minimal.utils.static.icons')
       local has_ls, ls = pcall(require, 'luasnip')
       local has_devicons, devicons = pcall(require, 'nvim-web-devicons')
-      local cmdline_utils = require('blink.cmp.sources.cmdline.utils')
+      local blink_source_utils = require('blink.cmp.sources.cmdline.utils')
       local blink_ctx = require('blink.cmp.completion.trigger.context')
 
       ---@param ctx blink.cmp.DrawItemContext
@@ -43,7 +43,7 @@ return {
           )
           or vim.tbl_contains(
             { 'dir', 'file', 'file_in_path', 'runtime' },
-            cmdline_utils.get_completion_type(blink_ctx.get_mode())
+            blink_source_utils.get_completion_type(blink_ctx.get_mode())
           )
       end
 
@@ -53,7 +53,7 @@ return {
         return items[1] and items[1].source_id == 'cmdline'
           or vim.tbl_contains(
             { 'function', 'expression' },
-            cmdline_utils.get_completion_type(blink_ctx.get_mode())
+            blink_source_utils.get_completion_type(blink_ctx.get_mode())
           )
       end
 
@@ -103,8 +103,7 @@ return {
                   -- nvim-web-devicons to show filetype icons if possible
                   text = function(ctx)
                     if not is_file_compl(ctx) then
-                      local icon = ctx.item.kind_icon or icons[ctx.kind]
-                      return icon --[[@as string]]
+                      return icons[ctx.kind] --[[@as string]]
                     end
 
                     if is_directory(ctx.item.label) then
@@ -145,7 +144,6 @@ return {
         },
         ---@type table<string, (blink.cmp.KeymapCommand|fun(cmp: blink.cmp.API): boolean?)[]|false>
         keymap = {
-          ['<CR>'] = { 'select_and_accept', 'fallback' },
           ['<C-u>'] = { 'scroll_documentation_up', 'fallback' },
           ['<C-d>'] = { 'scroll_documentation_down', 'fallback' },
           ['<C-p>'] = {
@@ -214,16 +212,6 @@ return {
               -- - https://github.com/Saghen/blink.cmp/issues/2042
               -- - https://cmp.saghen.dev/configuration/sources.html#show-buffer-completions-with-lsp
               timeout_ms = 500,
-              transform_items = function(_, items)
-                for _, item in ipairs(items) do
-                  if
-                    item.client_name == 'crates.nvim' and not item.kind_icon
-                  then
-                    item.kind_icon = icons.Package
-                  end
-                end
-                return items
-              end,
             },
             cmdline = {
               -- Don't complete left parenthesis when calling functions or

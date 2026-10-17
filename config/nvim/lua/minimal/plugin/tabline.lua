@@ -1,5 +1,10 @@
 local utils = require('minimal.utils')
 
+if vim.g.loaded_tabline ~= nil then
+  return {}
+end
+vim.g.loaded_tabline = true
+
 _G._tabline = {}
 
 ---Get tab display name given tabpage id and number
@@ -79,7 +84,9 @@ setmetatable(_G._tabline, {
     -- Colorize and add click response
     for tabnr, tabname in ipairs(tabnames) do
       tabnames[tabnr] = utils.stl.hl(
-        string.format('%%%dT%s%%X', tabnr, tabname),
+        -- Notice that we escape `%` characters in `tabname` to prevent
+        -- unintended tabline evaluation
+        string.format('%%%dT%s%%X', tabnr, tabname:gsub('%%', '%%%%')),
         tabnr == tabnrcur and 'TabLineSel' or 'TabLine'
       )
     end
@@ -156,5 +163,7 @@ vim.api.nvim_create_autocmd('TabClosed', {
     vim.g['Tabname' .. args.file] = nil
   end,
 })
+
+vim.opt.tabline = "%!v:lua.require'minimal.plugin.tabline'()"
 
 return _G._tabline

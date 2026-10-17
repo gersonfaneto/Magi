@@ -16,6 +16,9 @@ return {
   filetypes = {
     'c',
     'cpp',
+    'objc',
+    'objcpp',
+    'cuda',
   },
   root_markers = {
     {
@@ -27,13 +30,6 @@ return {
       'compile_commands.json',
       'compile_flags.txt',
       'configure.ac',
-    },
-    {
-      '.git',
-    },
-    {
-      ---@diagnostic disable-next-line undefined-field
-      vim.uv.cwd(), -- equivalent of `single_file_mode` in lspconfig
     },
   },
 }

@@ -1,5 +1,11 @@
 local utils = require('minimal.utils')
 local icons = require('minimal.utils.static.icons')
+
+if vim.g.loaded_statusline ~= nil then
+  return {}
+end
+vim.g.loaded_statusline = true
+
 local groupid = vim.api.nvim_create_augroup('minimal.statusline', {})
 
 _G._statusline = {}
@@ -130,10 +136,7 @@ end
 ---Get diff stats for current buffer
 ---@return string
 function _G._statusline.gitdiff()
-  local work_tree, git_dir = utils.git.resolve_context(
-    0,
-    { { '--git-dir', vim.env.DOT_DIR, '--work-tree', vim.env.HOME } }
-  )
+  local work_tree, git_dir = utils.git.resolve_context(0)
   if not work_tree or not git_dir then
     return ''
   end
@@ -175,10 +178,7 @@ end
 ---Get string representation of current git branch
 ---@return string
 function _G._statusline.gitbranch()
-  local work_tree, git_dir = utils.git.resolve_context(
-    0,
-    { { '--git-dir', vim.env.DOT_DIR, '--work-tree', vim.env.HOME } }
-  )
+  local work_tree, git_dir = utils.git.resolve_context(0)
   if not work_tree or not git_dir then
     return ''
   end
@@ -209,7 +209,14 @@ function _G._statusline.gitbranch()
     return ''
   end
 
-  local branch = vim.b.gitsigns_status_dict and vim.b.gitsigns_status_dict.head
+  local branch = vim.b.gitsigns_status_dict
+      -- `vim.b.gitsigns_status_dict.head` is an empty string in detached mode
+      -- in dotfile bare repo
+      and vim.b.gitsigns_status_dict.head ~= ''
+      and vim.b.gitsigns_status_dict.head
+    -- Use `--abbrev-ref` for branch name. In detached mode, this gives 'HEAD'
+    -- as the abbrev ref which is useless, then fallback to actual commit id
+    -- with `--short`
     or utils.git.execute(
       0,
       vim.list_extend(
@@ -217,6 +224,16 @@ function _G._statusline.gitbranch()
         { 'rev-parse', '--abbrev-ref', 'HEAD' }
       )
     )
+  if branch == 'HEAD' then
+    branch = utils.git.execute(
+      0,
+      vim.list_extend(
+        vim.deepcopy(use_cur_repo_args),
+        { 'rev-parse', '--short', 'HEAD' }
+      )
+    )
+  end
+
   if not branch then
     return ''
   end
@@ -791,5 +808,7 @@ utils.hl.persist(function()
   utils.hl.set(0, 'StatusLineHeaderModified',  { fg = 'Special', bg = 'fg', ctermfg = 'Special', ctermbg = 'fg', reverse = true, default = true })
   -- stylua: ignore end
 end)
+
+vim.opt.statusline = "%!v:lua.require'minimal.plugin.statusline'()"
 
 return _G._statusline

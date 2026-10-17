@@ -118,7 +118,6 @@ load.on_keys('<Leader>x', 'minimal.module')             -- lazy load on key
 ### Backend auto-detection pattern
 
 When a plugin needs platform-specific backends (e.g., `minimal.plugin.im`), use a `backends/` subdirectory with:
-
 - `backends/init.lua` -- defines a base class and a `detect()` function that discovers and instantiates available backends
 - `backends/<name>.lua` -- each backend, returning a class table with a `:new()` constructor
 
@@ -149,6 +148,10 @@ function Foo:detect() -- luacheck: no unused args
 ### Types
 
 Use LuaLS annotations on all module tables and functions:
+
+Always prefer the most precise available type. Use generated API types,
+including nested field types, instead of broad types such as `table` or `any`
+when an accurate type is available.
 
 ```lua
 ---@class minimal.utils.fs
@@ -188,7 +191,6 @@ end
 ### Linting
 
 Run `luacheck -q .` before completing work. The `.luacheckrc` configures:
-
 - Standard: `luajit`
 - Global: `vim`
 - Max line length: disabled (stylua handles this)

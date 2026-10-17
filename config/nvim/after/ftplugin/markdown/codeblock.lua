@@ -17,19 +17,19 @@ local has_quantified_captures = vim.fn.has('nvim-0.11.0') == 1
 
 local dash_string = '-'
 
----@class minimal.ft.markdown.codeblock.range
+---@class minimal.ft.markdown.codeblock.rangerangerange
 ---@field start_row integer
 ---@field end_row integer
 
 ---Merge overlapping or adjacent buffer ranges.
----@param ranges minimal.ft.markdown.codeblock.range[]
----@return minimal.ft.markdown.codeblock.range[] merged
+---@param ranges minimal.ft.markdown.codeblock.range[]nge[]nge[]
+---@return minimal.ft.markdown.codeblock.range[] mergedergederged
 local function merge_ranges(ranges)
   table.sort(ranges, function(a, b)
     return a.start_row < b.start_row
   end)
 
-  ---@type minimal.ft.markdown.codeblock.range[]
+  ---@type minimal.ft.markdown.codeblock.range[]nge[]nge[]
   local merged = {}
   for _, range in ipairs(ranges) do
     local previous = merged[#merged]
@@ -45,10 +45,10 @@ end
 
 ---Get the merged row ranges visible in normal windows for a buffer.
 ---@param buf integer
----@return minimal.ft.markdown.codeblock.range[] ranges visible, non-overlapping ranges.
+---@return minimal.ft.markdown.codeblock.range[] ranges visible, non-overlapping ranges.nges.nges.
 ---@return string range_id cache key containing the editor width and ranges.
 local function get_visible_ranges(buf)
-  ---@type minimal.ft.markdown.codeblock.range[]
+  ---@type minimal.ft.markdown.codeblock.range[]nge[]nge[]
   local ranges = {}
 
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do

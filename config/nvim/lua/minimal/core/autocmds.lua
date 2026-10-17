@@ -235,7 +235,7 @@ do
               return
             end
             pcall(vim.cmd.lcd, {
-              root_dir,
+              vim.fn.fnameescape(root_dir),
               mods = {
                 silent = true,
                 emsg_silent = true,
@@ -475,20 +475,20 @@ augroup('minimal.dynamic_cc', {
 })
 
 do
-  -- local hl = require('minimal.utils.hl')
+  local hl = require('minimal.utils.hl')
 
-  -- -- Set default value for `hl-NormalSpecial`
-  -- hl.persist(function()
-  --   hl.set(
-  --     0,
-  --     'NormalSpecial',
-  --     vim.tbl_deep_extend(
-  --       'force',
-  --       hl.blend('Normal', 'CursorLine'),
-  --       { default = true }
-  --     )
-  --   )
-  -- end)
+  ---Set default value for `hl-NormalSpecial`
+  hl.persist(function()
+    hl.set(
+      0,
+      'NormalSpecial',
+      vim.tbl_deep_extend(
+        'force',
+        hl.blend('Normal', 'CursorLine'),
+        { default = true }
+      )
+    )
+  end)
 
   augroup('minimal.special_buf_hl', {
     { 'BufEnter', 'BufNew', 'FileType', 'TermOpen' },
@@ -601,41 +601,24 @@ end
 do
   local json = require('minimal.utils.json')
 
-  local colors_config_file = vim.fs.joinpath(
-    vim.fn.getenv('XDG_STATE_HOME') or vim.fn.expand('~/.local/state'),
-    'minimal/minimal.json'
-  )
+  local colors_config_file =
+    vim.fs.joinpath(vim.fn.stdpath('state'), 'colors.json')
 
-  --- Read theme state and apply it: configure the built-in minimal theme
-  --- from the shared state file (name, variant, colorize), then load the
-  --- colorscheme once the UI is ready.
+  ---Restore dark/light background and colorscheme from json so that nvim
+  ---'remembers' the background and colorscheme when it is restarted.
   local function restore_colorscheme()
-    local colors_config =
-      vim.tbl_deep_extend('keep', json.read(colors_config_file), {
-        name = 'minimal',
-        variant = 'dark',
-        colorize = true,
-        transparent = false,
-      })
+    local colors_config = vim.tbl_deep_extend(
+      'keep',
+      json.read(colors_config_file),
+      { bg = 'dark', colors_name = 'nano' }
+    )
 
-    vim.go.bg = colors_config.variant
-
-    -- Configure the built-in theme before loading the colorscheme
-    if colors_config.name == 'minimal' then
-      require('minimal.theme').setup({
-        colorize = colors_config.colorize,
-        transparent = colors_config.transparent,
-        styles = {
-          sidebars = 'dark',
-          floats = 'dark',
-        },
-      })
-    end
+    vim.go.bg = colors_config.bg
 
     -- Colorschemes provided by plugins are not loaded before fully startup
     if vim.v.vim_did_enter == 1 then
       vim.cmd.colorscheme({
-        args = { colors_config.name },
+        args = { colors_config.colors_name },
         mods = { emsg_silent = true },
       })
     end
@@ -661,54 +644,40 @@ do
       callback = restore_colorscheme,
     },
   }, {
-    'OptionSet',
-    {
-      nested = true,
-      pattern = 'background',
-      callback = function()
-        if vim.g.script_background then
-          return
-        end
-        local opts = require('minimal.theme.config').options
-        if opts then
-          require('minimal.theme.theme').setup(opts)
-        end
-      end,
-    },
-  }, {
     'Colorscheme',
     {
       nested = true,
-      desc = 'Persist theme state and spawn system sync commands.',
+      desc = 'Spawn setbg/setcolors on colorscheme change.',
       callback = function()
-        if vim.g.script_background then
+        if vim.g.script_set_bg or vim.g.script_set_colors then
           return
         end
 
         vim.schedule(function()
           local colors_config = json.read(colors_config_file)
-          local theme_config = require('minimal.theme.config')
-          local changed = false
 
-          if colors_config.variant ~= vim.go.bg then
-            colors_config.variant = vim.go.bg
-            changed = true
-            if vim.fn.executable('background') == 1 then
-              vim.system({ 'background', vim.go.bg })
+          if
+            colors_config.colors_name == vim.g.colors_name
+            and colors_config.bg == vim.go.bg
+          then
+            return
+          end
+
+          if colors_config.colors_name ~= vim.g.colors_name then
+            colors_config.colors_name = vim.g.colors_name
+            if vim.fn.executable('setcolor') == 1 then
+              vim.system({ 'setcolor', vim.g.colors_name })
             end
           end
 
-          local new_colorize = theme_config.options
-              and theme_config.options.colorize
-            or false
-          if colors_config.colorize ~= new_colorize then
-            colors_config.colorize = new_colorize
-            changed = true
+          if colors_config.bg ~= vim.go.bg and vim.go.termguicolors then
+            colors_config.bg = vim.go.bg
+            if vim.fn.executable('setbg') == 1 then
+              vim.system({ 'setbg', vim.go.bg })
+            end
           end
 
-          if changed then
-            json.write(colors_config_file, colors_config)
-          end
+          json.write(colors_config_file, colors_config)
         end)
       end,
     },
