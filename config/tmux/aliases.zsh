@@ -2,7 +2,6 @@
 
 alias ta='tmux attach'
 alias tl='tmux ls'
-alias tm='tmuxinator'
 
 if [[ -n $TMUX ]]; then # From inside tmux
   alias tr="tmux rename-window"

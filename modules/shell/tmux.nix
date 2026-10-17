@@ -19,13 +19,11 @@ in {
   config = mkIf cfg.enable {
     environment.variables = {
       TMUX_HOME = "${config.hey.configDir}/tmux";
-      TMUXINATOR_CONFIG = "${config.hey.configDir}/tmux/tmuxinator/";
     };
 
     # I avoid programs.tmux because it comes with extra magic I don't need.
     user.packages = with pkgs; [
       tmux
-      tmuxinator
     ];
 
     environment.etc."tmux.conf".text = with pkgs.tmuxPlugins; ''
@@ -35,25 +33,28 @@ in {
       ${concatMapStrings (path: "source-file '${path}'\n") cfg.rcFiles}
 
       # Run plugins
+      run-shell ${continuum.rtp}
+      run-shell ${resurrect.rtp}
+
       run-shell ${extrakto.rtp}
       run-shell ${fuzzback.rtp}
       run-shell ${prefix-highlight.rtp}
     '';
 
-    modules.wm.theme.files.tmux = let
-      theme = "${config.home.configDir}/tmux/themes/noctalia.conf";
-    in {
-      input_path = "${config.hey.configDir}/tmux/colors.template.conf";
-      output_path = theme;
-      # noctalia-community-templates ships an apply.sh that does this, but is
-      # hardcoded to look for ~/.config/tmux/tmux.conf and writes to it.
-      post_hook = ''
-        for sock in "''${TMUX_TMPDIR:-/tmp}"/tmux-$(id -u)/*; do
-          [ -S "$sock" ] || continue
-          ${getExe pkgs.tmux} -S "$sock" source-file ${theme} >/dev/null 2>&1 || true
-        done
-      '';
-    };
+    # modules.wm.theme.files.tmux = let
+    #   theme = "${config.home.configDir}/tmux/themes/noctalia.conf";
+    # in {
+    #   input_path = "${config.hey.configDir}/tmux/colors.template.conf";
+    #   output_path = theme;
+    #   # noctalia-community-templates ships an apply.sh that does this, but is
+    #   # hardcoded to look for ~/.config/tmux/tmux.conf and writes to it.
+    #   post_hook = ''
+    #     for sock in "''${TMUX_TMPDIR:-/tmp}"/tmux-$(id -u)/*; do
+    #       [ -S "$sock" ] || continue
+    #       ${getExe pkgs.tmux} -S "$sock" source-file ${theme} >/dev/null 2>&1 || true
+    #     done
+    #   '';
+    # };
 
     modules.shell.zsh.rcFiles = ["${config.hey.configDir}/tmux/aliases.zsh"];
   };

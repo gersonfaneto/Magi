@@ -5,4 +5,4 @@
 #   hey .qr FILE
 #   echo TEXT | hey .qr
 
-cat $@ | hey.do -! -p libqrencode qrencode -t ansiutf8
+cat $@ | hey.do -! -p qrencode qrencode -t ansiutf8
