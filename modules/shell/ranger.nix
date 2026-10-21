@@ -30,6 +30,7 @@ in {
         highlight # scope.sh fallback highlighter
         atool # scope.sh archive listing
         w3m # scope.sh html preview
+        imagemagick # scope.sh image previews and sixel encoding
       ]
       ++ cfg.extraPackages;
 
