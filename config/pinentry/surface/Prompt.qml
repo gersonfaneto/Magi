@@ -286,28 +286,41 @@ FocusScope {
 
                 ListModel { id: beadModel }
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 9 * card.s
-                    visible: !card.reveal && input.text.length > 0
+                /**
+                 * The beads scroll instead of spilling past the capsule: the
+                 * freshest stays at the right edge and older ones drop off the
+                 * left, like the text they stand for.
+                 */
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: 22 * card.s
+                    anchors.rightMargin: 48 * card.s
+                    clip: true
 
-                    Repeater {
-                        model: beadModel
-                        delegate: Rectangle {
-                            id: bead
-                            required property int index
-                            width: 7 * card.s
-                            height: width
-                            radius: width / 2
-                            color: bead.index === input.text.length - 1 ? Theme.cream : Theme.verm
-                            scale: 0
-                            Component.onCompleted: pop.start()
-                            NumberAnimation { id: pop; target: bead; property: "scale"; to: 1; duration: 170; easing.type: Easing.OutBack }
-                            SequentialAnimation on opacity {
-                                running: bead.index === input.text.length - 1
-                                loops: Animation.Infinite
-                                NumberAnimation { to: 0.35; duration: 480 }
-                                NumberAnimation { to: 1; duration: 480 }
+                    Row {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 9 * card.s
+                        visible: !card.reveal && input.text.length > 0
+
+                        Repeater {
+                            model: beadModel
+                            delegate: Rectangle {
+                                id: bead
+                                required property int index
+                                width: 7 * card.s
+                                height: width
+                                radius: width / 2
+                                color: bead.index === input.text.length - 1 ? Theme.cream : Theme.verm
+                                scale: 0
+                                Component.onCompleted: pop.start()
+                                NumberAnimation { id: pop; target: bead; property: "scale"; to: 1; duration: 170; easing.type: Easing.OutBack }
+                                SequentialAnimation on opacity {
+                                    running: bead.index === input.text.length - 1
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.35; duration: 480 }
+                                    NumberAnimation { to: 1; duration: 480 }
+                                }
                             }
                         }
                     }
