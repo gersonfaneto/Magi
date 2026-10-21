@@ -122,5 +122,28 @@ in {
       input_path = "${config.magi.configDir}/theme/fzf.template.opts";
       output_path = "${config.home.configDir}/fzf/theme.opts";
     };
+
+    # The shell itself: prompt, directory colours, syntax highlighting and
+    # autosuggestions all read the same palette bundle as the rest of the
+    # desktop. They land in XDG dirs and are sourced by config/zsh/.zshrc (the
+    # prompt one last, since prompt.zsh unsets every POWERLEVEL9K_*).
+    modules.wm.theme.files = {
+      zsh-p10k = {
+        input_path = "${config.magi.configDir}/theme/p10k.template.zsh";
+        output_path = "${config.home.configDir}/zsh/theme.p10k.zsh";
+      };
+      zsh-dircolors = {
+        input_path = "${config.magi.configDir}/theme/dircolors.template.dircolors";
+        output_path = "${config.home.configDir}/zsh/dircolors.theme";
+      };
+      zsh-syntax-highlighting = {
+        input_path = "${config.magi.configDir}/theme/zsh-syntax-highlighting.template.zsh";
+        output_path = "${config.home.configDir}/zsh/theme.fsh.zsh";
+      };
+      zsh-autosuggestions = {
+        input_path = "${config.magi.configDir}/theme/zsh-autosuggestions.template.zsh";
+        output_path = "${config.home.configDir}/zsh/theme.autosuggest.zsh";
+      };
+    };
   };
 }

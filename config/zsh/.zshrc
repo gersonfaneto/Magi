@@ -128,7 +128,72 @@ if [[ $TERM != dumb ]]; then
   # zpm compiles its own (and fpath), but my zsh libs must be compiled manually.
   magi.load ${${(%):-%x}:A:h}/{completion,keybinds,aliases,prompt}.zsh
 
-  magi.cache dircolors -b
+  ## Palette-driven shell theming
+  # theme.py renders these from the active bundle (see modules/shell/zsh.nix).
+  # The prompt file has to come after prompt.zsh, which unsets every
+  # POWERLEVEL9K_* parameter at the top of its config function.
+  typeset -g __magi_theme_dir=${XDG_CONFIG_HOME:-$HOME/.config}/zsh
+  typeset -gA __magi_theme_seen
+  typeset -ga __magi_theme_files=(
+    $__magi_theme_dir/theme.p10k.zsh
+    $__magi_theme_dir/theme.fsh.zsh
+    $__magi_theme_dir/theme.autosuggest.zsh
+  )
+  zmodload -F zsh/stat b:zstat
+
+  # zstat is a builtin, so the watch below costs no forks per prompt.
+  typeset -g __magi_theme_m
+  __magi_theme_mtime() {
+    local -a mtime
+    zstat -A mtime +mtime -- $1 2>/dev/null || return 1
+    __magi_theme_m=$mtime[1]
+  }
+
+  __magi_theme_source() {
+    local f
+    for f in $__magi_theme_files(N); do
+      __magi_theme_mtime $f && __magi_theme_seen[$f]=$__magi_theme_m
+      # The styles assign into an array the plugin declares, so only apply them
+      # when fast-syntax-highlighting actually loaded (no zpm, no network).
+      if [[ ${f:t} == theme.fsh.zsh ]] && (( ! ${+parameters[FAST_HIGHLIGHT_STYLES]} )); then
+        continue
+      fi
+      source $f
+    done
+  }
+
+  __magi_theme_dircolors() {
+    local db=$__magi_theme_dir/dircolors.theme
+    if [[ -r $db ]]; then
+      eval "$(dircolors -b $db 2>/dev/null)"
+    else
+      eval "$(dircolors -b 2>/dev/null)"
+    fi
+  }
+
+  # Repaint already-open shells when `magi theme` rewrites the palette. Runs
+  # after p10k's own precmd (which saves $?), and hands $? back untouched for
+  # whatever hook follows.
+  __magi_theme_watch() {
+    local ret=$? f
+    local -a stale
+    for f in $__magi_theme_files(N); do
+      __magi_theme_mtime $f || continue
+      (( __magi_theme_m > ${__magi_theme_seen[$f]:-0} )) && stale+=($f)
+    done
+    if (( $#stale )); then
+      __magi_theme_source
+      __magi_theme_dircolors
+      (( $+functions[p10k] )) && p10k reload
+    fi
+    return $ret
+  }
+
+  __magi_theme_source
+  __magi_theme_dircolors
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd __magi_theme_watch
+
   magi.cache zoxide init zsh
   (( $+functions[autopair-init] )) && autopair-init
 

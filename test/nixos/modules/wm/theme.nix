@@ -106,6 +106,25 @@ in {
     expected = "${c.home.configDir}/fzf/theme.opts";
   };
 
+  # The shell reads the same bundle as the rest of the desktop: prompt,
+  # dircolors, fast-syntax-highlighting and autosuggestions.
+  testZshTargets = let
+    c = desktop [{modules.shell.zsh.enable = true;}];
+  in {
+    expr = {
+      p10k = c.modules.wm.theme.files."zsh-p10k".output_path;
+      dircolors = c.modules.wm.theme.files."zsh-dircolors".output_path;
+      syntax = c.modules.wm.theme.files."zsh-syntax-highlighting".output_path;
+      autosuggest = c.modules.wm.theme.files."zsh-autosuggestions".output_path;
+    };
+    expected = {
+      p10k = "${c.home.configDir}/zsh/theme.p10k.zsh";
+      dircolors = "${c.home.configDir}/zsh/dircolors.theme";
+      syntax = "${c.home.configDir}/zsh/theme.fsh.zsh";
+      autosuggest = "${c.home.configDir}/zsh/theme.autosuggest.zsh";
+    };
+  };
+
   testTmuxTarget = let
     c = desktop [{modules.shell.tmux.enable = true;}];
   in {

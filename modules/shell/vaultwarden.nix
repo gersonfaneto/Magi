@@ -10,7 +10,7 @@
 with lib;
 with self.lib; let
   cfg = config.modules.shell.vaultwarden;
-  gpgPinentry = config.programs.gnupg.agent.pinentryPackage;
+  gpgPinentry = config.modules.shell.gnupg.pinentry;
   rbw = getExe pkgs.rbw;
   jq = getExe pkgs.jq;
 in {
@@ -24,7 +24,7 @@ in {
 
     modules.shell.vaultwarden.settings.pinentry = mkDefault (
       if gpgPinentry != null
-      then getExe gpgPinentry
+      then gpgPinentry
       else getExe pkgs.pinentry-curses
     );
 

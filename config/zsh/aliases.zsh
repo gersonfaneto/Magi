@@ -5,7 +5,10 @@ alias -- -='cd -'
 
 alias :q=exit
 alias cl=clear
-alias sudo='sudo '
+# The trailing space lets the alias after sudo expand too; -A sends the
+# password prompt to the Quickshell pinentry card (modules/wm/pinentry.nix),
+# which falls back to the terminal when the shell isn't running.
+alias sudo='sudo -A '
 alias rm='rm -i'
 alias mkdir='mkdir -pv'
 alias wget='wget -c'

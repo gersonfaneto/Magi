@@ -8,9 +8,10 @@
 #
 # DESCRIPTION:
 #   Switches the palette source to the named scheme and re-renders every
-#   consumer through theme.py: foot, highlight, nvim, Hyprland, Qt and the
-#   Quickshell surfaces. With no argument, the registry's default scheme is
-#   used.
+#   consumer through theme.py: foot, highlight, nvim, Hyprland, Qt, the
+#   Quickshell surfaces, tmux, fzf and the zsh shell (prompt, dircolors,
+#   syntax highlighting and autosuggestions). Open zsh shells repaint on the
+#   next prompt. With no argument, the registry's default scheme is used.
 #
 # ARGUMENTS:
 #   * COLORSCHEME @arg-colorscheme  e.g. nano, macro, sonokai (default: nano)

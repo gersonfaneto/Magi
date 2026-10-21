@@ -2,9 +2,10 @@
 """Apply and render the desktop theme.
 
 One palette bundle drives every consumer: the Quickshell pill and lock read
-current.json, and the manifest here renders Hyprland, Qt, foot, highlight and
-the generated nvim colorscheme from that same file. The bundle comes from the
-Nix-built scheme set or from wallcolors.py for the dynamic mode.
+current.json, and the manifest here renders Hyprland, Qt, foot, highlight, the
+generated nvim colorscheme, tmux, fzf and the zsh shell from that same file.
+The bundle comes from the Nix-built scheme set or from wallcolors.py for the
+dynamic mode.
 
     theme.py apply [--refresh]
     theme.py source scheme|dynamic
@@ -58,7 +59,7 @@ DEFAULT_FLAGS = {
 
 COLOR_TOKEN = re.compile(
     r"\{\{\s*(colors|terminal)\.([a-z0-9_]+)(?:\.(?:default|dark|light))?"
-    r"\.(hex_stripped|hex|rgb)\s*\}\}"
+    r"\.(hex_stripped|hex|rgb|ansi38|ansi48)\s*\}\}"
 )
 BUNDLE_TOKEN = re.compile(r"\{\{\s*bundle\.([a-z0-9_]+)\s*\}\}")
 
@@ -288,7 +289,11 @@ def format_colour(value, fmt):
     if fmt == "hex_stripped":
         return value[1:]
     r, g, b = (int(value[i : i + 2], 16) for i in (1, 3, 5))
-    return f"rgb({r}, {g}, {b})"
+    if fmt == "rgb":
+        return f"rgb({r}, {g}, {b})"
+    if fmt == "ansi48":
+        return f"48;2;{r};{g};{b}"
+    return f"38;2;{r};{g};{b}"
 
 
 def render(text, bundle):

@@ -14,7 +14,8 @@
 #
 # DESCRIPTION:
 #   One palette bundle drives the Quickshell pill and lock, Hyprland, Qt,
-#   foot, highlight and nvim. The scheme list lives in
+#   foot, highlight, nvim, tmux, fzf and the zsh shell (prompt, dircolors,
+#   syntax highlighting and autosuggestions). The scheme list lives in
 #   config/theme/schemes.json; wallpaper-derived palettes are generated at
 #   runtime by wallcolors.py.
 #
