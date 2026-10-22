@@ -54,10 +54,11 @@ in {
     };
 
     # The card listens on $XDG_RUNTIME_DIR/quickshell-pinentry.sock; pinning the
-    # variable on the unit keeps it the same hub the shim guesses.
+    # variable on the unit keeps it the same hub the shim guesses. The unit is
+    # not started at login: the shim starts it on the first prompt and the
+    # surface quits after ten idle minutes, so an unused card costs no RAM.
     systemd.user.services.quickshell-pinentry = {
       description = "Quickshell pinentry (passphrase card)";
-      wantedBy = ["graphical-session.target"];
       partOf = ["graphical-session.target"];
       after = [
         "graphical-session.target"
@@ -69,7 +70,7 @@ in {
       serviceConfig = {
         ExecStart = "${getExe' qcfg.package "qs"} -p ${config.magi.configDir}/pinentry/surface";
         Environment = "XDG_RUNTIME_DIR=%t";
-        Restart = "always";
+        Restart = "on-failure";
         RestartSec = 1;
       };
     };
@@ -77,13 +78,6 @@ in {
     # gpg-agent spawns the shim instead of pinentry-qt. Absolute, since the
     # agent runs with systemd's environment, not the login shell's.
     modules.shell.gnupg.pinentry = mkDefault "${config.home.dir}/.local/bin/pinentry-quickshell";
-
-    # switch-to-configuration doesn't start units for a target the session has
-    # already reached, so a surface added by a switch would sit dead until the
-    # next login. The user activation script runs as the user on every switch.
-    system.userActivationScripts.magi-start-pinentry = ''
-      systemctl --user start --no-block quickshell-pinentry.service || true
-    '';
 
     # sudo and ssh only consult askpass when there's no terminal, so point them
     # at the card and let ssh ask it even from a TTY (SSH_ASKPASS_REQUIRE).

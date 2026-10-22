@@ -17,6 +17,8 @@ Item {
     property color color: Theme.iconDim
     property real stroke: 1.8
 
+    Behavior on color { ColorAnimation { duration: Motion.fast } }
+
     readonly property real u: Math.min(width, height) / 24
 
     readonly property var glyphs: ({

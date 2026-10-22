@@ -11,6 +11,17 @@ ShellRoot {
 
     readonly property string currentUser: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
 
+    /** Publish lock state for the pill, which pauses cava while the card is up. */
+    readonly property string lockStatePath:
+        (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/quickshell-locked"
+
+    function writeLockState(value): void {
+        Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" > \"$2\"", "_",
+                                 value, root.lockStatePath]);
+    }
+
+    Component.onCompleted: writeLockState("0")
+
     /** Drives the pill-to-lock reveal. Kept off while the surface first mounts so the mask starts as the pill, then flipped on to grow it open; flipped back to collapse it before the session actually unlocks. */
     property bool revealed: false
 
@@ -30,6 +41,7 @@ ShellRoot {
             sessionLock.locked = false;
             Cava.enabled = false;
             Pw.text = "";
+            root.writeLockState("0");
         }
     }
 
@@ -43,6 +55,7 @@ ShellRoot {
     function doLock(): void {
         Pw.text = "";
         root.revealed = false;
+        root.writeLockState("1");
         sessionLock.locked = true;
         Cava.enabled = true;
         reveal.restart();

@@ -73,7 +73,7 @@ in {
         ddcutil # external-monitor brightness (Mixer faders)
         xorg.xrandr # XWayland primary flag when the Display surface swaps the main monitor
         gpu-screen-recorder # recorder surface
-        ffmpeg # wallpaper stills and thumbnails
+        ffmpeg-headless # wallpaper stills and thumbnails; no X11/GL needed
         mpvpaper # video wallpapers
         rnnoise-plugin # mic noise filter
         hypridle # idle / lock
@@ -81,7 +81,10 @@ in {
         gamemode # game mode surface
         imagemagick # wallpaper analysis and thumbnails
         adw-gtk3 # base theme for the GTK app palette
-        tesseract # rishot OCR
+        # rishot OCR. The stock tesseract drags tessdata-all (1 GiB); the
+        # languages actually used are enough. Add to this list when OCR needs
+        # another language.
+        (tesseract.override {enableLanguages = ["eng" "por" "osd"];})
         kdePackages.kdialog # rishot save dialog
       ];
 

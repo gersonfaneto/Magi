@@ -23,6 +23,11 @@ Rectangle {
         ? Qt.rgba(Theme.vermLit.r, Theme.vermLit.g, Theme.vermLit.b, 0.45)
         : ((chip.lit || area.containsMouse) ? Theme.vermDim : Theme.border)
 
+    scale: area.pressed ? 0.96 : 1
+    Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
+    Behavior on color { ColorAnimation { duration: Motion.fast } }
+    Behavior on border.color { ColorAnimation { duration: Motion.fast } }
+
     Text {
         id: label
         anchors.centerIn: parent

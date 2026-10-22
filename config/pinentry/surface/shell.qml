@@ -16,6 +16,10 @@ import Quickshell.Wayland
  *
  * Only one card is drawn at a time. Requests that arrive while it is up wait
  * in `queue`, so a second gpg call never steals the prompt from the first.
+ *
+ * The unit is started on demand by the shim, so an idle card would otherwise
+ * sit in RAM forever. After ten quiet minutes it exits cleanly; the next
+ * prompt starts it again.
  */
 ShellRoot {
     id: root
@@ -23,6 +27,20 @@ ShellRoot {
     property var queue: []
     property var current: null
     property string targetScreen: ""
+
+    /** Quit after this long with no request; the shim restarts the unit. */
+    readonly property int idleExitMs: 600000
+    Timer {
+        id: idleExit
+        interval: root.idleExitMs
+        running: true
+        repeat: false
+        onTriggered: {
+            if (root.current === null && root.queue.length === 0)
+                Qt.quit();
+        }
+    }
+    Component.onCompleted: idleExit.restart()
 
     /** modules/wm/pinentry.nix pins XDG_RUNTIME_DIR on the service; the
      *  fallback only keeps a manual run from building a bogus path. */
@@ -39,6 +57,7 @@ ShellRoot {
         }
         if (!req || typeof req !== "object")
             return;
+        idleExit.restart();
         root.queue = root.queue.concat([{conn: conn, req: req}]);
         root.pump();
     }
@@ -64,6 +83,7 @@ ShellRoot {
             // the peer's close from being logged as a socket error.
             cur.conn.connected = false;
         }
+        idleExit.restart();
         root.pump();
     }
 
@@ -74,6 +94,7 @@ ShellRoot {
         });
         if (root.current !== null && root.current.conn === conn) {
             root.current = null;
+            idleExit.restart();
             root.pump();
         }
     }

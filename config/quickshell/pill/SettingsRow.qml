@@ -38,11 +38,12 @@ Item {
         anchors.topMargin: 3 * srow.s
         anchors.bottomMargin: 3 * srow.s
         radius: 9 * srow.s
-        color: (srowHover.hovered || srow.focused) ? Theme.frameBg : "transparent"
+        color: srowMouse.pressed ? Qt.alpha(Theme.cream, 0.085) : ((srowHover.hovered || srow.focused) ? Theme.frameBg : "transparent")
         Behavior on color { ColorAnimation { duration: Motion.fast } }
     }
 
     MouseArea {
+        id: srowMouse
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: if (srow.surface) srow.surface.activateRow(srow)

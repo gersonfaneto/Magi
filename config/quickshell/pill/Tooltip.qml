@@ -7,7 +7,7 @@ import "Singletons"
  * centred on it; `placement` decides whether the bubble floats above (pointer
  * down) or below (pointer up) so chips near the pill edge never clip off-screen.
  * The host sets `show` from the control's own HoverHandler; the bubble arms
- * after a hover delay, fades in slowly and out fast.
+ * after a short hover delay, fades in quickly and out fast.
  *
  * Non-interactive by design: no MouseArea or HoverHandler lives here, so it
  * never steals pointer events from the controls or the mixer's hover tracker.
@@ -40,11 +40,16 @@ Item {
 
     visible: armed || opacity > 0.01
     opacity: armed ? 1 : 0
-    Behavior on opacity { NumberAnimation { duration: root.armed ? Motion.standard : Motion.fast } }
+    Behavior on opacity {
+        NumberAnimation {
+            duration: Motion.fast
+            easing.type: Motion.easeStandard
+        }
+    }
 
     Timer {
         id: delay
-        interval: 470
+        interval: 320
         onTriggered: root.armed = true
     }
     onShowChanged: {

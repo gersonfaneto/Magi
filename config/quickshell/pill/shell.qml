@@ -33,6 +33,32 @@ ShellRoot {
     property string peekMon: ""
     property string menuPayload: ""
 
+    /**
+     * Session-lock state, written by the lock surface (config/quickshell/lock).
+     * While locked the pill is under the lock client, so the audio visualizer
+     * has nothing visible to feed; pausing cava saves its FFT and our parsing.
+     */
+    property bool sessionLocked: false
+    readonly property string lockStatePath:
+        (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/quickshell-locked"
+
+    /**
+     * True when every monitor's active workspace has a fullscreen client. The
+     * pill is retracted on all of them, so cava has no visible consumer either.
+     */
+    readonly property bool allMonitorsFullscreen: {
+        var mons = Hyprland.monitors.values;
+        if (mons.length === 0)
+            return false;
+        for (var i = 0; i < mons.length; i++) {
+            var ws = mons[i].activeWorkspace;
+            var o = ws ? ws.lastIpcObject : null;
+            if (!o || !o.hasfullscreen)
+                return false;
+        }
+        return true;
+    }
+
     function refresh() {
         Hyprland.refreshMonitors();
         Hyprland.refreshWorkspaces();
@@ -74,6 +100,23 @@ ShellRoot {
             if (payload.length > 0)
                 root.openMenu(payload);
         }
+    }
+
+    /** The lock surface keeps this file in sync; a stale file is cleared on its startup. */
+    FileView {
+        path: root.lockStatePath
+        watchChanges: true
+        blockLoading: true
+        printErrors: false
+        onLoaded: root.sessionLocked = text().trim() === "1"
+        onFileChanged: reload()
+        onLoadFailed: root.sessionLocked = false
+    }
+
+    Binding {
+        target: Cava
+        property: "paused"
+        value: root.sessionLocked || root.allMonitorsFullscreen
     }
     Process {
         id: updatedToast

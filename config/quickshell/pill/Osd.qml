@@ -211,7 +211,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "volume" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         GlyphIcon {
             id: volGlyph
@@ -266,7 +266,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "track" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         ClippingRectangle {
             id: coverBox
@@ -374,7 +374,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "brightness" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         GlyphIcon {
             id: brightGlyph
@@ -428,7 +428,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "battery" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         GlyphIcon {
             id: battGlyph
@@ -509,7 +509,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "workspace" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         Workspaces {
             id: wsIndicator
@@ -526,7 +526,7 @@ Item {
         anchors.fill: parent
         opacity: root.kind === "record" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
         Rectangle {
             id: recGlyph

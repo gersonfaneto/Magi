@@ -62,7 +62,7 @@ Item {
                     color: Theme.frameBg
                     border.width: 1
                     border.color: Theme.frameBorder
-                    opacity: area.containsMouse ? 1 : 0
+                    opacity: (area.containsMouse || area.pressed) ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: Motion.fast } }
                 }
 
@@ -77,6 +77,9 @@ Item {
                     smooth: true
                     cache: true
                     asynchronous: true
+
+                    scale: area.pressed ? 0.9 : 1
+                    Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
                 }
 
                 MouseArea {
@@ -143,8 +146,11 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: mrow.indent
             radius: 8 * tray.s
-            color: (mrowArea.containsMouse || mrow.focused) && mrow.entryData.enabled
-                ? Theme.frameBg : "transparent"
+            color: mrowArea.pressed && mrow.entryData.enabled
+                ? Qt.alpha(Theme.cream, 0.085)
+                : ((mrowArea.containsMouse || mrow.focused) && mrow.entryData.enabled
+                    ? Theme.frameBg : "transparent")
+            Behavior on color { ColorAnimation { duration: Motion.fast } }
 
             Rectangle {
                 anchors.left: parent.left

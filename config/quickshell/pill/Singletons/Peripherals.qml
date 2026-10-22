@@ -14,7 +14,8 @@ import Quickshell.Services.UPower
  * own battery; the rest are USB-dongle peripherals the surface lists on their
  * own. `connectedCount` tracks connected Bluetooth devices reactively through
  * an Instantiator, since a plain binding on the device list misses per-device
- * connected flips. A peripheral at or below 20% raises one notify-send, reset
+ * connected flips. Charge and state changes arrive as UPower signals, so there
+ * is no poll timer. A peripheral at or below 20% raises one notify-send, reset
  * once it climbs back or disappears.
  */
 Singleton {
@@ -107,12 +108,20 @@ Singleton {
 
     onListChanged: refresh()
 
-    Timer {
-        interval: 30000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.refresh()
+    Component.onCompleted: refresh()
+
+    /**
+     * UPower signals charge and state changes itself, so no polling timer is
+     * needed; the existing `onListChanged` covers devices appearing and going.
+     */
+    Instantiator {
+        model: (typeof UPower !== "undefined" && UPower) ? UPower.devices : null
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            function onPercentageChanged() { root.refresh() }
+            function onStateChanged() { root.refresh() }
+        }
     }
 
     Instantiator {

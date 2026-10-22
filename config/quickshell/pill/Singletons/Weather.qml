@@ -9,8 +9,8 @@ import Quickshell.Io
  * coordinates: by default the city, latitude and longitude come from a keyless IP
  * lookup (ip-api), but a non-empty `Flags.weatherCity` override geocodes that name
  * via Open-Meteo's geocoder instead. Once coordinates are known the forecast runs
- * immediately and then every 20 minutes, exposing the current conditions plus a
- * 24-hour hourly strip.
+ * immediately, then hourly in the background and on demand when the hover glance
+ * or the calendar opens and the data is stale.
  *
  * Everything is async through `Process` + `curl`, mirroring how Sysmon and Devices
  * fetch, so startup never blocks on a slow or absent connection. Every JSON parse
@@ -38,6 +38,7 @@ Singleton {
     property real lat: 0
     property real lon: 0
     property bool located: false
+    property real lastFetch: 0
 
     /**
      * Maps a WMO weather code to its on-brand kanji. Clear skies show 月 at night
@@ -86,6 +87,13 @@ Singleton {
         if (!located || wxProc.running)
             return;
         wxProc.running = true;
+    }
+
+    /** Refresh only when the last successful fetch is older than MAXAGE milliseconds. */
+    function refreshIfStale(maxAgeMs) {
+        if (Date.now() - root.lastFetch < maxAgeMs)
+            return;
+        root.fetchWeather();
     }
 
     /**
@@ -219,13 +227,14 @@ Singleton {
                     root.hourly = rows;
                     root.daily = days;
                     root.ready = true;
+                    root.lastFetch = Date.now();
                 } catch (e) {}
             }
         }
     }
 
     Timer {
-        interval: 1200000
+        interval: 3600000
         running: true
         repeat: true
         onTriggered: root.fetchWeather()

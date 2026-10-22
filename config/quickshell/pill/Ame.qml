@@ -576,8 +576,12 @@ Item {
      * The blur layer allocates an FBO the size of the whole pill; while the bead
      * is hidden (wallpaper strip, toast, plain hover) that's pure GPU tax on an
      * empty canvas, so the layer only exists while something is drawn or fading.
+     * A flight repaints the canvas every frame, so the halo is dropped for the
+     * duration of the timeline and restored on settle: a moving bead barely
+     * shows it, and this keeps the pill's morph from sharing the frame with a
+     * full-size blur pass.
      */
-    layer.enabled: opacity > 0.001 || busy
+    layer.enabled: (opacity > 0.001 || busy) && !root.timelineLive
     layer.effect: MultiEffect {
         blurEnabled: true
         blur: 0.34

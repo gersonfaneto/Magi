@@ -12,15 +12,24 @@
 #
 # When the shell isn't reachable (a TTY session, or the service is down) this
 # falls back to reading from the terminal so gpg, ssh and sudo keep working.
+# The card's unit is not started at login; a failed connect starts it and waits
+# briefly, so an idle shell costs no RAM and the first prompt still gets the
+# card.
 
 import json
 import os
 import socket
+import subprocess
 import sys
 import termios
+import time
 
 # $XDG_RUNTIME_DIR/<name>; the surface listens here (config/pinentry/surface/shell.qml).
 SOCKET = "quickshell-pinentry.sock"
+# The idle card quits; this is the unit the shim starts for the next prompt.
+SERVICE = "quickshell-pinentry.service"
+# How long to wait for that on-demand start before falling back to the terminal.
+AUTOSTART_TIMEOUT = 4.0
 # The agent gives up on its own eventually; this keeps a dead client from
 # blocking the card forever if the shell never answers.
 ASK_TIMEOUT = 300.0
@@ -94,30 +103,62 @@ def reply(line):
     sys.stdout.flush()
 
 
+def start_surface():
+    """Start the idle card's user unit. False when systemd isn't reachable."""
+    try:
+        proc = subprocess.run(
+            ["systemctl", "--user", "start", "--no-block", SERVICE],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
 def ask_surface(request, timeout=ASK_TIMEOUT):
-    """Show REQUEST in the shell. Returns its reply, or None if it isn't there."""
+    """Show REQUEST in the shell. Returns its reply, or None if it isn't there.
+
+    A card that has been idle is gone, so a failed connect starts its unit and
+    retries for a moment. If it still doesn't come up, the caller falls back to
+    the terminal, exactly as when the shell was never running.
+    """
     path = socket_path()
-    if not os.path.exists(path):
-        return None
-    conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    conn.settimeout(timeout)
-    buf = b""
-    try:
-        conn.connect(path)
-        conn.sendall((json.dumps(request) + "\n").encode())
-        while b"\n" not in buf:
-            chunk = conn.recv(4096)
-            if not chunk:
+    deadline = time.monotonic() + AUTOSTART_TIMEOUT
+    started = False
+    while True:
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        conn.settimeout(timeout)
+        try:
+            conn.connect(path)
+        except OSError:
+            conn.close()
+            if not started and not os.environ.get("PINENTRY_NO_AUTOSTART"):
+                if not start_surface():
+                    return None
+                started = True
+            if time.monotonic() >= deadline:
                 return None
-            buf += chunk
-    except OSError:
-        return None
-    finally:
-        conn.close()
-    try:
-        return json.loads(buf.split(b"\n", 1)[0].decode())
-    except ValueError:
-        return None
+            time.sleep(0.05)
+            continue
+
+        buf = b""
+        try:
+            conn.sendall((json.dumps(request) + "\n").encode())
+            while b"\n" not in buf:
+                chunk = conn.recv(4096)
+                if not chunk:
+                    return None
+                buf += chunk
+        except OSError:
+            return None
+        finally:
+            conn.close()
+        try:
+            return json.loads(buf.split(b"\n", 1)[0].decode())
+        except ValueError:
+            return None
 
 
 def tty_name(agent_tty=""):

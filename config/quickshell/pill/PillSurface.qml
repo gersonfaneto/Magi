@@ -59,8 +59,19 @@ Item {
     opacity: open ? (settled ? 1 : Math.pow(morphCloseness, 1.3)) : 0
     visible: opacity > 0.01
 
+    /**
+     * The open fade tracks `morphCloseness` frame by frame. While the morph is
+     * running the Behavior is off: retargeting a 240ms fade on every frame made
+     * the content arrive a beat after the pill was already open. It comes back
+     * for the last settle nudge and for the close fade, where a real animation
+     * is what we want.
+     */
     Behavior on opacity {
-        NumberAnimation { duration: Motion.standard; easing.type: Motion.easeStandard }
+        enabled: !surface.open || surface.settled
+        NumberAnimation {
+            duration: surface.settled ? Motion.fast : Motion.standard
+            easing.type: Motion.easeStandard
+        }
     }
 
     /**

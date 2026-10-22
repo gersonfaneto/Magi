@@ -224,6 +224,74 @@ Item {
     }
 
     /**
+     * Hover intent: a cold surface builds synchronously on click, which is
+     * exactly when it is most visible as a hitch. The pointer usually rests on
+     * a control for a beat before clicking, so arm the matching loader after a
+     * short dwell. A loader that was only previewed (never opened) is reclaimed
+     * by `preloadIdle`; opened surfaces go back to the normal unloadIdle path.
+     */
+    function loaderFor(name) {
+        switch (name) {
+        case "calendar": return ldCalendar;
+        case "media": return ldMedia;
+        case "wifi": return ldWifi;
+        case "bt": return ldBt;
+        case "battery": return ldBattery;
+        case "link": return ldLink;
+        case "mixer": return ldMixer;
+        case "sound": return ldSound;
+        case "sysmon": return ldSysmon;
+        case "recorder": return ldRecorder;
+        case "settings": return ldSettings;
+        case "power": return ldPower;
+        }
+        return null;
+    }
+
+    property string preloadName: ""
+    property var preloaded: ({})
+
+    function preloadSurface(name) {
+        if (!loaderFor(name))
+            return;
+        pill.preloadName = name;
+        preloadTimer.restart();
+    }
+
+    Timer {
+        id: preloadTimer
+        interval: 120
+        onTriggered: {
+            if (pill.preloadName === "")
+                return;
+            const ld = pill.loaderFor(pill.preloadName);
+            if (ld && !ld.active) {
+                ld.active = true;
+                const next = {};
+                for (const name in pill.preloaded)
+                    next[name] = true;
+                next[pill.preloadName] = true;
+                pill.preloaded = next;
+            }
+            pill.preloadName = "";
+            preloadIdle.restart();
+        }
+    }
+
+    Timer {
+        id: preloadIdle
+        interval: 60000
+        onTriggered: {
+            for (const name in pill.preloaded) {
+                const ld = pill.loaderFor(name);
+                if (ld && ld.active && !(ld.item && ld.item.open))
+                    ld.active = false;
+            }
+            pill.preloaded = ({});
+        }
+    }
+
+    /**
      * Single source of truth for every morphing surface, keyed by its `surface`
      * string. Each entry owns the surface's target size (a thunk so the geometry
      * it reads registers as a live dep of targetSize) and a thunk resolving the
@@ -665,6 +733,8 @@ Item {
     onSurfaceOpenChanged: if (surfaceOpen) {
         unloadIdle.stop();
         pinned = false;
+        if (surface === "calendar")
+            Weather.refreshIfStale(1200000);
         if (quickHere && ScreenRec.quickChoosing) {
             ScreenRec.quickChoosing = false;
             ScreenRec.quickScreenChoosing = false;
@@ -757,7 +827,7 @@ Item {
     onHoverArrivedChanged: if (hoverArrived) hoverSoulGate = true
 
     /**
-     * Rest and hover sit a few dozen pixels apart, so the 420ms morph is nearly
+     * Rest and hover sit a few dozen pixels apart, so the full morph is nearly
      * all settle tail on that hop and reads sluggish. Both endpoints in the
      * rest/hover pair get the shorter glide; every real surface morph keeps the
      * full duration.
@@ -768,6 +838,8 @@ Item {
     onModeChanged: {
         hoverHop = (mode === "hover" || mode === "rest") && (lastMode === "hover" || lastMode === "rest");
         lastMode = mode;
+        if (mode === "hover")
+            Weather.refreshIfStale(1200000);
         if (mode !== "hover") {
             hoverSoulGate = false;
             soulTarget = "";
@@ -796,6 +868,8 @@ Item {
      * shadow) re-renders its offscreen buffer at every size step, on every
      * monitor, so it is the top per-frame cost of a morph; dropping the shadow
      * mid-flight and restoring it on settle keeps the morph cheap (issue #20).
+     * A rest/hover hop is a tiny surface, so it keeps its shadow; only a real
+     * surface morph pays the flat-body trade.
      */
     readonly property bool morphing: morphAnimW.running || morphAnimH.running || morphAnimR.running
 
@@ -853,7 +927,11 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: pill.requestSurface("media")
-            onContainsMouseChanged: budBead.requestPaint()
+            onContainsMouseChanged: {
+                budBead.requestPaint();
+                if (containsMouse)
+                    pill.preloadSurface("media");
+            }
         }
     }
 
@@ -880,7 +958,7 @@ Item {
             GradientStop { position: 1.0; color: Qt.alpha(Theme.cardBot, Flags.pillOpacity) }
         }
 
-        layer.enabled: !pill.morphing
+        layer.enabled: !pill.morphing || pill.hoverHop
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowColor: Qt.rgba(0, 0, 0, Theme.shadowOpacity)
@@ -1583,8 +1661,10 @@ Item {
                     width: hoverClock.implicitWidth + 22 * pill.s
                     height: hoverClock.implicitHeight + 10 * pill.s
                     enabled: hover.live
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: pill.requestSurface("calendar")
+                    onContainsMouseChanged: if (containsMouse) pill.preloadSurface("calendar")
                 }
             }
 
@@ -1609,6 +1689,7 @@ Item {
                     HoverHandler {
                         cursorShape: Qt.PointingHandCursor
                         enabled: hover.live
+                        onHoveredChanged: if (hovered) pill.preloadSurface("calendar")
                     }
                     TapHandler {
                         enabled: hover.live
@@ -1752,7 +1833,10 @@ Item {
                                 }
                                 pill.requestSurface("wifi");
                             }
-                            onContainsMouseChanged: if (containsMouse) pill.soulTarget = "wifi"
+                            onContainsMouseChanged: if (containsMouse) {
+                                pill.soulTarget = "wifi";
+                                pill.preloadSurface("wifi");
+                            }
                         }
                     }
 
@@ -1804,7 +1888,10 @@ Item {
                                 }
                                 pill.requestSurface("bt");
                             }
-                            onContainsMouseChanged: if (containsMouse) pill.soulTarget = "bt"
+                            onContainsMouseChanged: if (containsMouse) {
+                                pill.soulTarget = "bt";
+                                pill.preloadSurface("bt");
+                            }
                         }
                     }
 
@@ -1834,7 +1921,10 @@ Item {
                             enabled: hover.live
                             cursorShape: Qt.PointingHandCursor
                             onClicked: pill.requestSurface("battery")
-                            onContainsMouseChanged: if (containsMouse) pill.soulTarget = "battery"
+                            onContainsMouseChanged: if (containsMouse) {
+                                pill.soulTarget = "battery";
+                                pill.preloadSurface("battery");
+                            }
                         }
                     }
                 }
@@ -1872,7 +1962,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("link")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "inbox"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "inbox";
+                            pill.preloadSurface("link");
+                        }
                     }
                 }
 
@@ -1897,7 +1990,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("mixer")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "mixer"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "mixer";
+                            pill.preloadSurface("mixer");
+                        }
                     }
                 }
 
@@ -1922,7 +2018,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("sound")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "sound"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "sound";
+                            pill.preloadSurface("sound");
+                        }
                     }
                 }
 
@@ -1947,7 +2046,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("sysmon")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "sysmon"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "sysmon";
+                            pill.preloadSurface("sysmon");
+                        }
                     }
                 }
 
@@ -2000,7 +2102,10 @@ Item {
                             if (e.button === Qt.LeftButton && ScreenRec.recording)
                                 ScreenRec.stop();
                         }
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "recorder"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "recorder";
+                            pill.preloadSurface("recorder");
+                        }
                     }
                 }
 
@@ -2025,7 +2130,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("settings")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "settings"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "settings";
+                            pill.preloadSurface("settings");
+                        }
                     }
                 }
 
@@ -2050,7 +2158,10 @@ Item {
                         enabled: hover.live
                         cursorShape: Qt.PointingHandCursor
                         onClicked: pill.requestSurface("power")
-                        onContainsMouseChanged: if (containsMouse) pill.soulTarget = "power"
+                        onContainsMouseChanged: if (containsMouse) {
+                            pill.soulTarget = "power";
+                            pill.preloadSurface("power");
+                        }
                     }
                 }
             }
@@ -2063,17 +2174,22 @@ Item {
      * synchronously on its first open. Each loader fills the pill so
      * the PillSurface inside anchors exactly as it did as a direct child.
      *
-     * The hot trio preloads shortly after startup: the mixer needs its Pipewire
-     * trackers bound before it looks right, so a cold first open visibly popped
-     * faders in. Startup itself stays light.
+     * The mixer preloads shortly after startup: it needs its Pipewire trackers
+     * bound before it looks right, so a cold first open visibly popped faders
+     * in. Media and Link are only preloaded on the primary screen; other
+     * monitors build them on first open, keeping their idle footprint off.
+     * Startup itself stays light.
      */
     Timer {
         interval: 2500
         running: true
         onTriggered: {
             ldMixer.active = true;
-            ldMedia.active = true;
-            ldLink.active = true;
+            const primary = Quickshell.screens.length > 0 ? Quickshell.screens[0].name : "";
+            if (pill.screenName === primary) {
+                ldMedia.active = true;
+                ldLink.active = true;
+            }
         }
     }
 

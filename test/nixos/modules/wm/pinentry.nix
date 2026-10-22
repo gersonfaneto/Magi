@@ -55,19 +55,22 @@ in {
   ## The surface.
 
   # A -p path, so the card is the live checkout rather than a snapshot: a QML
-  # edit only needs the service to reload it.
+  # edit only needs the service to reload it. It is started on demand by the
+  # shim, so it must not be wanted by the session target.
   testRunsTheCardFromTheCheckout = {
     expr = {
       path = hasInfix "-p /etc/magi/config/pinentry/surface" unit.serviceConfig.ExecStart;
       qs = hasInfix "/bin/qs" unit.serviceConfig.ExecStart;
       restart = unit.serviceConfig.Restart;
       sessionPath = unit.enableDefaultPath;
+      wanted = unit.wantedBy or [];
     };
     expected = {
       path = true;
       qs = true;
-      restart = "always";
+      restart = "on-failure";
       sessionPath = false;
+      wanted = [];
     };
   };
 
@@ -78,13 +81,11 @@ in {
     expected = "XDG_RUNTIME_DIR=%t";
   };
 
-  # A switch only reaches targets that aren't up yet, so a surface added by one
-  # would stay dead until the next login; the user activation service starts it.
-  testSwitchStartsTheSurface = {
-    expr =
-      hasInfix "systemctl --user start --no-block quickshell-pinentry.service"
-      on.system.userActivationScripts.script;
-    expected = true;
+  # A switch must not start the card either: the shim does it on the first
+  # prompt, and a stale activation script would leave an idle Qt process around.
+  testSwitchDoesNotStartTheSurface = {
+    expr = on.system.userActivationScripts ? magi-start-pinentry;
+    expected = false;
   };
 
   ## The launchers.

@@ -19,9 +19,13 @@ Item {
         spacing: 7 * head.s
 
         Item {
+            id: backGlyph
             anchors.verticalCenter: parent.verticalCenter
             width: 16 * head.s
             height: 16 * head.s
+
+            scale: backArea.pressed ? 0.9 : 1
+            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Motion.easeStandard } }
 
             GlyphIcon {
                 anchors.fill: parent

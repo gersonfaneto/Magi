@@ -70,6 +70,8 @@ def base_env(runtime):
     env["XDG_RUNTIME_DIR"] = runtime
     # No terminal to fall back to: these tests assert the shell path.
     env["GPG_TTY"] = "/nonexistent"
+    # Don't ask systemd to start the real card from a test fixture.
+    env["PINENTRY_NO_AUTOSTART"] = "1"
     return env
 
 
