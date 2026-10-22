@@ -85,6 +85,8 @@ in {
       clang-tools
       shellcheck
       shfmt
+      # qmlls/qmllint/qmlformat for QML (config/nvim/after/lsp/qmlls.lua).
+      qt6.qtdeclarative
     ];
 
     # Symlink the whole config/nvim tree out of $XDG_CONFIG_HOME/nvim so edits
@@ -117,8 +119,25 @@ in {
 
     # config/nvim/lua/minimal/core/opts.lua gates its nerd-font icon set on
     # this being present; any value counts, so "1" is just conventional.
-    environment.sessionVariables = mkIf cfg.nerdFonts {
-      NVIM_NF = "1";
-    };
+    #
+    # qmlls (config/nvim/after/lsp/qmlls.lua) runs with `-E`, i.e. it reads
+    # this variable for QML module dirs. The store binary does not infer its
+    # own QML prefix, so qtdeclarative is explicit; the rest is what the
+    # vendored Quickshell rice imports (mirrors modules/wm/quickshell.nix).
+    environment.sessionVariables = mkMerge [
+      (mkIf cfg.nerdFonts {
+        NVIM_NF = "1";
+      })
+      {
+        QML_IMPORT_PATH = concatMapStringsSep ":" (p: "${p}/lib/qt-6/qml") (
+          [pkgs.qt6.qtdeclarative]
+          ++ optionals config.modules.wm.quickshell.enable [
+            pkgs.quickshell
+            pkgs.qt6.qtmultimedia
+            pkgs.qt6.qt5compat
+          ]
+        );
+      }
+    ];
   };
 }
