@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import "Singletons"
 import "lib/fuzzy.js" as Fuzzy
+import "lib/nav.js" as Nav
 
 /**
  * Shared add-app picker for the class-routing surfaces (Stash, SpaceApps).
@@ -117,9 +118,44 @@ Column {
     /** named to dodge Column's built-in `move` Transition property */
     function moveSel(delta) {
         if (results.length === 0)
-            return;
-        selectedIndex = Math.max(0, Math.min(results.length - 1, selectedIndex + delta));
+            return false;
+        selectedIndex = Nav.step(selectedIndex, results.length, delta, true);
         addList.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    function pageSel(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.page(selectedIndex, results.length, dir, 6, true);
+        addList.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    function edgeSel(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.edge(results.length, dir);
+        addList.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    function kbStep(dir) { return addOpen ? moveSel(dir) : false; }
+    function kbPage(dir) { return addOpen ? pageSel(dir) : false; }
+    function kbEdge(dir) { return addOpen ? edgeSel(dir) : false; }
+    function kbCycle(dir) { return addOpen ? moveSel(dir) : false; }
+    function kbActivate() {
+        if (!addOpen)
+            return false;
+        pick();
+        return true;
+    }
+    function kbBack() {
+        if (addOpen) {
+            closeAdd();
+            return true;
+        }
+        return false;
     }
 
     function openAdd() {
@@ -169,6 +205,9 @@ Column {
             picker.selectedIndex = 0;
         }
         onMoved: (d) => picker.moveSel(d)
+        onPaged: (d) => picker.pageSel(d)
+        onJumped: (d) => picker.edgeSel(d)
+        onCycled: (d) => picker.moveSel(d)
         onAccepted: picker.pick()
         onDismissed: picker.closeAdd()
     }

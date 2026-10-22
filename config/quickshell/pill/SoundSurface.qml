@@ -5,6 +5,7 @@ import QtQuick.Effects
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /** 音 SOUND surface with three tabs: EQ (boost, spectrum, modes, ten bands, shelves, AutoEQ, night), Apps (per-app volume, mute, output) and Mic (input, gain, noise filter). */
 PillSurface {
@@ -36,6 +37,7 @@ PillSurface {
     property bool boostOpen: false
     property string renaming: ""
     property int focusBand: -1
+    property int focusApp: -1
     property var levels: []
 
     readonly property var labels: ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
@@ -83,6 +85,155 @@ PillSurface {
         aeqOpen = false;
         renaming = "";
         focusBand = -1;
+        focusApp = -1;
+    }
+
+    function moveBand(dir) {
+        focusBand = Nav.step(focusBand, labels.length, dir, true);
+        return true;
+    }
+
+    function moveApp(dir) {
+        if (Sound.apps.length === 0)
+            return false;
+        focusApp = Nav.step(focusApp, Sound.apps.length, dir, true);
+        appsList.positionViewAtIndex(focusApp, ListView.Contain);
+        return true;
+    }
+
+    function focusedAppNode() {
+        return (focusApp >= 0 && focusApp < Sound.apps.length) ? Sound.apps[focusApp] : null;
+    }
+
+    function kbStep(dir) {
+        if (tab === "eq") {
+            if (focusBand < 0)
+                return moveBand(dir);
+            var b = bandRep.itemAt(focusBand);
+            if (!b)
+                return false;
+            Sound.setBand(b.index, Math.max(-Sound.range, Math.min(Sound.range, b.db - dir * 1)));
+            return true;
+        }
+        if (tab === "apps")
+            return moveApp(dir);
+        if (tab === "mic") {
+            if (!Sound.source || !Sound.source.audio)
+                return false;
+            var mv = Math.max(0, Math.min(2, Sound.source.audio.volume - dir * 0.05));
+            Sound.setNodeVolume(Sound.source, mv, "micvol", "Mic volume");
+            return true;
+        }
+        return false;
+    }
+
+    function kbAdjust(dir) {
+        if (tab === "eq")
+            return moveBand(dir);
+        if (tab === "apps") {
+            var n = focusedAppNode();
+            if (!n || !n.audio)
+                return moveApp(dir);
+            Sound.setNodeVolume(n, Math.max(0, Math.min(2, n.audio.volume + dir * 0.05)), "app" + n.id, "App volume");
+            return true;
+        }
+        return false;
+    }
+
+    function kbPage(dir) {
+        if (tab === "eq") {
+            if (focusBand < 0)
+                return moveBand(dir);
+            var b = bandRep.itemAt(focusBand);
+            if (!b)
+                return false;
+            Sound.setBand(b.index, Math.max(-Sound.range, Math.min(Sound.range, b.db - dir * 3)));
+            return true;
+        }
+        if (tab === "apps") {
+            if (Sound.apps.length === 0)
+                return false;
+            focusApp = Nav.page(focusApp, Sound.apps.length, dir, 6, true);
+            appsList.positionViewAtIndex(focusApp, ListView.Contain);
+            return true;
+        }
+        return false;
+    }
+
+    function kbEdge(dir) {
+        if (tab === "eq") {
+            focusBand = Nav.edge(labels.length, dir);
+            return true;
+        }
+        if (tab === "apps") {
+            if (Sound.apps.length === 0)
+                return false;
+            focusApp = Nav.edge(Sound.apps.length, dir);
+            appsList.positionViewAtIndex(focusApp, ListView.Contain);
+            return true;
+        }
+        return false;
+    }
+
+    function kbCycle(dir) {
+        if (tab === "eq")
+            return moveBand(dir);
+        if (tab === "apps")
+            return moveApp(dir);
+        return false;
+    }
+
+    function kbActivate() {
+        if (tab === "eq") {
+            if (focusBand < 0)
+                return moveBand(1);
+            Sound.setBand(focusBand, 0);
+            return true;
+        }
+        if (tab === "apps") {
+            var n = focusedAppNode();
+            if (!n || !n.audio)
+                return false;
+            Sound.setNodeMuted(n, !n.audio.muted);
+            return true;
+        }
+        return false;
+    }
+
+    function kbBack() {
+        if (editing) {
+            editing = false;
+            return true;
+        }
+        if (aeqOpen) {
+            aeqOpen = false;
+            return true;
+        }
+        if (boostOpen) {
+            boostOpen = false;
+            return true;
+        }
+        if (pickerOpen) {
+            pickerOpen = false;
+            return true;
+        }
+        if (renaming.length > 0) {
+            renaming = "";
+            return true;
+        }
+        if (routeStream !== null) {
+            routeStream = null;
+            return true;
+        }
+        return false;
+    }
+
+    function kbLetter(letter) {
+        if (letter === "j") return kbStep(1);
+        if (letter === "k") return kbStep(-1);
+        if (letter === "h") return kbAdjust(-1);
+        if (letter === "l") return kbAdjust(1);
+        return false;
     }
 
     /** App label from the stream: the binary when the client only reports a generic engine name (Chromium, WebRTC). */
@@ -350,7 +501,9 @@ PillSurface {
     component AppRow: Item {
         id: app
         required property var modelData
+        required property int index
         readonly property var props: modelData.properties || {}
+        readonly property bool focused: root.tab === "apps" && root.focusApp === index
         readonly property var target: Sound.targetOf(modelData)
         readonly property real vol: modelData.audio ? modelData.audio.volume : 0
         readonly property bool muted: modelData.audio ? modelData.audio.muted : false
@@ -370,7 +523,7 @@ PillSurface {
                 width: parent.width
                 text: root.appName(app.modelData, app.props)
                 elide: Text.ElideRight
-                color: appHover.hovered ? Theme.cream : Theme.subtle
+                color: (appHover.hovered || app.focused) ? Theme.cream : Theme.subtle
                 font.family: Theme.font
                 font.pixelSize: 10.5 * root.s
                 font.weight: Font.DemiBold
@@ -407,7 +560,10 @@ PillSurface {
                 anchors.margins: -5 * root.s
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Sound.setNodeMuted(app.modelData, !app.muted)
+                onClicked: {
+                    root.focusApp = app.index;
+                    Sound.setNodeMuted(app.modelData, !app.muted);
+                }
             }
         }
 
@@ -420,7 +576,7 @@ PillSurface {
             s: root.s
             value: app.vol / 2
             readout: Math.round(app.vol * 100) + "%"
-            focused: appHover.hovered
+            focused: appHover.hovered || app.focused
             on: !app.muted
             onMoved: (v) => Sound.setNodeVolume(app.modelData, Math.round(v * 200) / 100, "app" + app.modelData.id, "App volume")
         }
@@ -432,7 +588,7 @@ PillSurface {
             width: 90 * root.s
             height: 22 * root.s
             radius: 7 * root.s
-            color: root.routeStream === app.modelData ? Qt.alpha(Theme.onGlow, 0.14) : (chipArea.containsMouse ? Theme.frameBg : "transparent")
+            color: root.routeStream === app.modelData ? Qt.alpha(Theme.onGlow, 0.14) : ((chipArea.containsMouse || app.focused) ? Theme.frameBg : "transparent")
             border.width: 1
             border.color: root.routeStream === app.modelData ? Qt.alpha(Theme.onGlow, 0.5) : Theme.border
 

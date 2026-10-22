@@ -62,4 +62,28 @@ Item {
     Behavior on opacity {
         NumberAnimation { duration: Motion.standard; easing.type: Motion.easeStandard }
     }
+
+    /**
+     * Keyboard contract, overridden by surfaces that have rows or tiles. The
+     * host calls these through `Pill.navKey`; a false return lets the key fall
+     * through to another surface or be ignored. Keeping the defaults here means
+     * every surface answers the same calls without boilerplate.
+     *
+     * `kbStep` is Up/Down, `kbAdjust` Left/Right, `kbPage` PageUp/PageDown,
+     * `kbEdge` Ctrl+Home/Ctrl+End, `kbCycle` Tab/Shift+Tab, `kbActivate`
+     * Enter/Space, and `kbBack` Escape's one-level pop.
+     */
+    function kbStep(dir) { return false; }
+    function kbAdjust(dir) { return false; }
+    function kbPage(dir) { return false; }
+    function kbEdge(dir) { return false; }
+    function kbCycle(dir) { return false; }
+    function kbActivate() { return false; }
+    function kbRange() { return false; }
+    function kbDelete() { return false; }
+    function kbLetter(letter) { return false; }
+    function kbBack() { return false; }
+
+    /** Short footer hint for surfaces that opt in; empty leaves the footer out. */
+    property string kbHint: ""
 }

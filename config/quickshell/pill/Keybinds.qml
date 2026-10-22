@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import "lib/binds.js" as Binds
 import "lib/keychord.js" as Chord
+import "lib/nav.js" as Nav
 import "Singletons"
 
 /**
@@ -94,12 +95,51 @@ PillSurface {
      */
     function move(dir) {
         if (root.listening || root.formOpen)
-            return;
+            return false;
         if (root.filtered.length === 0)
-            return;
-        root.focusIndex = Math.max(0, Math.min(root.filtered.length - 1, root.focusIndex + dir));
+            return false;
+        root.focusIndex = Nav.step(root.focusIndex, root.filtered.length, dir, true);
         list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
     }
+
+    readonly property int pageRows: 8
+
+    function page(dir) {
+        if (root.listening || root.formOpen || root.filtered.length === 0)
+            return false;
+        root.focusIndex = Nav.page(root.focusIndex, root.filtered.length, dir, pageRows, true);
+        list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
+    }
+
+    function edge(dir) {
+        if (root.listening || root.formOpen || root.filtered.length === 0)
+            return false;
+        root.focusIndex = Nav.edge(root.filtered.length, dir);
+        list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
+    }
+
+    /** Pop the editor form (or a live capture), then let the parent rule run. */
+    function back() {
+        if (root.listening) {
+            root.listening = false;
+            return true;
+        }
+        if (root.formOpen) {
+            root.closeForm();
+            return true;
+        }
+        return false;
+    }
+
+    function kbStep(dir) { return move(dir); }
+    function kbPage(dir) { return page(dir); }
+    function kbEdge(dir) { return edge(dir); }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { activate(); return true; }
+    function kbBack() { return back(); }
 
     /**
      * Open the unified form in EDIT mode for the focused row, seeding form state
@@ -351,6 +391,9 @@ PillSurface {
                 root.focusIndex = 0;
             }
             onMoved: (d) => root.move(d)
+            onPaged: (d) => root.page(d)
+            onJumped: (d) => root.edge(d)
+            onCycled: (d) => root.move(d)
             onAccepted: root.activate()
         }
 

@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Bluetooth
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * 歯 BLUETOOTH surface: kanji header, scan with 25s auto-stop, adapter toggle,
@@ -79,6 +80,18 @@ PillSurface {
      */
     property string expandedAddress: ""
 
+    /** Unified keyboard cursor over the CONNECTED and NEARBY blocks. */
+    property int focusIndex: 0
+
+    readonly property var focusRows: {
+        var out = [];
+        for (var i = 0; i < connectedRows.length; i++)
+            out.push(connectedRows[i]);
+        for (var j = 0; j < nearbyRows.length; j++)
+            out.push({ bt: nearbyRows[j], up: null });
+        return out;
+    }
+
     implicitHeight: listFrame.y + listFrame.height
 
     /**
@@ -126,6 +139,84 @@ PillSurface {
      * the inline confirm row rather than acting at once; an unpaired device
      * runs the bluetoothctl pair-trust-connect flow.
      */
+    function focusRowData() {
+        return (focusIndex >= 0 && focusIndex < focusRows.length) ? focusRows[focusIndex] : null;
+    }
+
+    function ensureFocusVisible() {
+        var y = 0;
+        for (var i = 0; i < focusIndex; i++)
+            y += focusRows[i].bt ? (focusRows[i].bt.connected ? 52 : 40) * root.s : 52 * root.s;
+        var h = 40 * root.s;
+        if (y < devFlick.contentY)
+            devFlick.contentY = y;
+        else if (y + h > devFlick.contentY + devFlick.height)
+            devFlick.contentY = y + h - devFlick.height;
+    }
+
+    function moveFocus(dir) {
+        if (focusRows.length === 0)
+            return false;
+        focusIndex = Nav.step(focusIndex, focusRows.length, dir, true);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function pageFocus(dir) {
+        if (focusRows.length === 0)
+            return false;
+        focusIndex = Nav.page(focusIndex, focusRows.length, dir, 6, true);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function edgeFocus(dir) {
+        if (focusRows.length === 0)
+            return false;
+        focusIndex = Nav.edge(focusRows.length, dir);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function activateFocused() {
+        var row = focusRowData();
+        var d = row ? row.bt : null;
+        if (!d)
+            return false;
+        if (expandedAddress === d.address) {
+            if (d.connected)
+                disconnectDevice(d);
+            else
+                connectDevice(d);
+            return true;
+        }
+        activateDevice(d);
+        return true;
+    }
+
+    function kbStep(dir) { return moveFocus(dir); }
+    function kbPage(dir) { return pageFocus(dir); }
+    function kbEdge(dir) { return edgeFocus(dir); }
+    function kbCycle(dir) { return moveFocus(dir); }
+    function kbActivate() { return activateFocused(); }
+    function kbBack() {
+        if (expandedAddress.length > 0) {
+            expandedAddress = "";
+            return true;
+        }
+        return false;
+    }
+    function kbLetter(letter) {
+        if (letter === "j") return moveFocus(1);
+        if (letter === "k") return moveFocus(-1);
+        if (letter === "r") {
+            if (adapter)
+                adapter.discovering = !adapter.discovering;
+            return true;
+        }
+        return false;
+    }
+
     function activateDevice(d) {
         if (!d)
             return;
@@ -171,8 +262,11 @@ PillSurface {
         pairProc.running = true;
     }
 
+    onFocusRowsChanged: if (focusIndex >= focusRows.length) focusIndex = Math.max(0, focusRows.length - 1)
+
     onActiveChanged: {
         if (active) {
+            focusIndex = 0;
             if (adapter && adapter.enabled) {
                 adapter.discovering = true;
                 scanTimer.restart();
@@ -385,7 +479,9 @@ PillSurface {
                     Column {
                         id: conItem
                         required property var modelData
+                        required property int index
                         readonly property var bt: modelData ? modelData.bt : null
+                        readonly property bool focused: root.focusIndex === index && bt !== null
                         readonly property var up: modelData ? modelData.up : null
                         readonly property string addr: (bt && bt.address) ? bt.address : ""
                         readonly property int battery: root.batteryFor(modelData)
@@ -402,7 +498,7 @@ PillSurface {
                             width: parent.width
                             height: 50 * root.s
                             radius: 10 * root.s
-                            color: (conHover.hovered && conItem.bt) ? Theme.frameBg : "transparent"
+                            color: ((conHover.hovered || conItem.focused) && conItem.bt) ? Theme.frameBg : "transparent"
 
                             HoverHandler { id: conHover }
 
@@ -410,7 +506,10 @@ PillSurface {
                                 anchors.fill: parent
                                 enabled: conItem.bt !== null
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.activateDevice(conItem.bt)
+                                onClicked: {
+                                    root.focusIndex = conItem.index;
+                                    root.activateDevice(conItem.bt);
+                                }
                             }
 
                             Rectangle {
@@ -576,6 +675,8 @@ PillSurface {
                     Column {
                         id: devItem
                         required property var modelData
+                        required property int index
+                        readonly property bool focused: root.focusIndex === root.connectedRows.length + index
                         readonly property bool isPaired: modelData ? modelData.paired === true : false
                         readonly property string addr: (modelData && modelData.address) ? modelData.address : ""
                         readonly property bool pairing: addr.length > 0 && root.pairingAddress === addr
@@ -590,14 +691,17 @@ PillSurface {
                             width: parent.width
                             height: 38 * root.s
                             radius: 9 * root.s
-                            color: rowHover.hovered ? Theme.frameBg : "transparent"
+                            color: (rowHover.hovered || devItem.focused) ? Theme.frameBg : "transparent"
 
                             HoverHandler { id: rowHover }
 
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.activateDevice(devItem.modelData)
+                                onClicked: {
+                                    root.focusIndex = root.connectedRows.length + devItem.index;
+                                    root.activateDevice(devItem.modelData);
+                                }
                             }
 
                             Rectangle {

@@ -6,6 +6,7 @@ import Quickshell.Io
 import "Singletons"
 import "lib/fuzzy.js" as Fuzzy
 import "lib/calc.js" as Calc
+import "lib/nav.js" as Nav
 
 /**
  * Launcher surface: search field over a ranked application list, drawn as one
@@ -122,10 +123,57 @@ PillSurface {
 
     function move(delta) {
         if (results.length === 0)
-            return;
-        selectedIndex = Math.max(0, Math.min(results.length - 1, selectedIndex + delta));
+            return false;
+        selectedIndex = Nav.step(selectedIndex, results.length, delta, true);
         list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
     }
+
+    readonly property int pageRows: Math.max(1, Math.floor(list.height / ((38 + 5) * root.s)))
+
+    function page(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.page(selectedIndex, results.length, dir, pageRows, true);
+        list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    function edge(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.edge(results.length, dir);
+        list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    /** Alt+N launches the Nth visible result without moving the selection. */
+    function number(n) {
+        if (n < 1 || n > results.length)
+            return false;
+        selectedIndex = n - 1;
+        activate();
+        return true;
+    }
+
+    /** Escape clears the query before it closes the launcher. */
+    function back() {
+        if (query.length > 0 || search.text.length > 0) {
+            search.text = "";
+            query = "";
+            selectedIndex = 0;
+            return true;
+        }
+        return false;
+    }
+
+    function kbStep(dir) { return move(dir); }
+    function kbPage(dir) { return page(dir); }
+    function kbEdge(dir) { return edge(dir); }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { activate(); return true; }
+    function kbBack() { return back(); }
+    function kbNumber(n) { return number(n); }
 
     function activate() {
         if (root.calcActive) {
@@ -190,8 +238,12 @@ PillSurface {
             root.selectedIndex = 0;
         }
         onMoved: (d) => root.move(d)
+        onPaged: (d) => root.page(d)
+        onJumped: (d) => root.edge(d)
+        onCycled: (d) => root.move(d)
+        onNumbered: (n) => root.number(n)
         onAccepted: root.activate()
-        onDismissed: root.requestClose()
+        onDismissed: if (!root.back()) root.requestClose()
     }
 
     Rectangle {

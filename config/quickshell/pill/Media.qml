@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell.Widgets
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * Now-playing card. Album art bleeds edge-to-edge on the left, faded into the
@@ -53,10 +54,16 @@ PillSurface {
 
     /** Source picker is open; only reachable when more than one player runs. */
     property bool picking: false
+    property int pickIndex: 0
     readonly property bool canPick: Players.pickable.length > 1
     onActiveChanged: if (!active) picking = false
     onCanPickChanged: if (!canPick) picking = false
-    onPickingChanged: if (picking) pickFlick.contentX = 0
+    onPickingChanged: if (picking) {
+        pickIndex = Math.max(0, Players.pickable.indexOf(Players.active));
+        pickFlick.contentX = 0;
+        ensurePickVisible();
+    }
+    onPickIndexChanged: if (picking) ensurePickVisible()
 
     readonly property real textX: 134 * s
     readonly property real edgePad: 18 * s
@@ -84,6 +91,117 @@ PillSurface {
         var m = Math.floor(t / 60);
         var ss = t % 60;
         return m + ":" + (ss < 10 ? "0" + ss : ss);
+    }
+
+    function movePick(dir) {
+        var list = Players.pickable;
+        if (list.length === 0)
+            return false;
+        pickIndex = Nav.step(pickIndex, list.length, dir, true);
+        ensurePickVisible();
+        return true;
+    }
+
+    function ensurePickVisible() {
+        var child = pickRow.children[pickIndex];
+        if (!child)
+            return;
+        var x = child.x;
+        var w = child.width;
+        if (x < pickFlick.contentX)
+            pickFlick.contentX = x;
+        else if (x + w > pickFlick.contentX + pickFlick.width)
+            pickFlick.contentX = x + w - pickFlick.width;
+    }
+
+    function selectPick() {
+        var list = Players.pickable;
+        if (pickIndex < 0 || pickIndex >= list.length)
+            return false;
+        Players.select(list[pickIndex]);
+        picking = false;
+        return true;
+    }
+
+    function seekBy(seconds) {
+        if (!root.player || !root.player.canSeek || !root.player.positionSupported || root.lengthSec <= 0)
+            return false;
+        root.player.position = Math.max(0, Math.min(root.lengthSec, root.positionSec + seconds));
+        return true;
+    }
+
+    function kbStep(dir) {
+        if (picking)
+            return movePick(dir);
+        return seekBy(-dir * 10);
+    }
+
+    function kbAdjust(dir) {
+        if (picking)
+            return movePick(dir);
+        if (!root.player)
+            return false;
+        if (dir < 0 && root.player.canGoPrevious) {
+            root.player.previous();
+            return true;
+        }
+        if (dir > 0 && root.player.canGoNext) {
+            root.player.next();
+            return true;
+        }
+        return false;
+    }
+
+    function kbPage(dir) {
+        if (picking)
+            return movePick(dir);
+        return seekBy(-dir * 30);
+    }
+
+    function kbEdge(dir) {
+        if (!picking)
+            return false;
+        pickIndex = Nav.edge(Players.pickable.length, dir);
+        ensurePickVisible();
+        return true;
+    }
+
+    function kbCycle(dir) {
+        if (picking)
+            return movePick(dir);
+        if (canPick) {
+            picking = true;
+            return true;
+        }
+        return false;
+    }
+
+    function kbActivate() {
+        if (picking)
+            return selectPick();
+        if (root.player && root.player.canTogglePlaying) {
+            root.player.togglePlaying();
+            return true;
+        }
+        return false;
+    }
+
+    function kbBack() {
+        if (picking) {
+            picking = false;
+            return true;
+        }
+        return false;
+    }
+
+    function kbLetter(letter) {
+        if (letter === "n") return kbAdjust(1);
+        if (letter === "p") return kbAdjust(-1);
+        if (letter === "s" && canPick) {
+            picking = true;
+            return true;
+        }
+        return false;
     }
 
     function mix(a, b, t) {
@@ -436,14 +554,16 @@ PillSurface {
                     delegate: Rectangle {
                         id: bub
                         required property var modelData
+                        required property int index
                         readonly property bool isActive: modelData === Players.active
+                        readonly property bool focused: root.picking && root.pickIndex === index
                         anchors.verticalCenter: parent.verticalCenter
                         height: 32 * root.s
                         width: bubInner.width + 18 * root.s
                         radius: 11 * root.s
                         color: isActive ? Qt.alpha(Theme.verm, 0.2) : Qt.alpha(Theme.cream, 0.045)
-                        border.width: 1
-                        border.color: isActive ? Theme.vermLit : Qt.alpha(Theme.cream, 0.12)
+                        border.width: bub.focused ? 2 : 1
+                        border.color: bub.focused ? Theme.cream : (isActive ? Theme.vermLit : Qt.alpha(Theme.cream, 0.12))
 
                         Row {
                             id: bubInner
@@ -481,6 +601,7 @@ PillSurface {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
+                                root.pickIndex = bub.index;
                                 Players.select(bub.modelData);
                                 root.picking = false;
                             }

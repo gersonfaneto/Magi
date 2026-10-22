@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * 波 WIFI surface: kanji header, wifi enable toggle and the live network list
@@ -42,6 +43,9 @@ PillSurface {
     property bool connectFailed: false
     property string connFailReason: ""
     property bool scanning: false
+
+    /** Keyboard cursor in the signal-sorted network list. */
+    property int focusIndex: 0
 
     /** Detail line under the connected row: IPv4 address plus band and bitrate from nmcli. */
     property string connIp: ""
@@ -97,6 +101,84 @@ PillSurface {
     function isEnterprise(ssid) {
         var sec = securityMap[ssid] || "";
         return /802\.?1x|wpa[0-9]?-?eap|\beap\b/i.test(sec);
+    }
+
+    function focusNet() {
+        return (focusIndex >= 0 && focusIndex < netsSorted.length) ? netsSorted[focusIndex] : null;
+    }
+
+    function ensureFocusVisible() {
+        var row = 32 * root.s;
+        var top = focusIndex * row;
+        var bottom = top + row;
+        if (top < netFlick.contentY)
+            netFlick.contentY = top;
+        else if (bottom > netFlick.contentY + netFlick.height)
+            netFlick.contentY = bottom - netFlick.height;
+    }
+
+    function moveFocus(dir) {
+        if (netsSorted.length === 0)
+            return false;
+        focusIndex = Nav.step(focusIndex, netsSorted.length, dir, true);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function pageFocus(dir) {
+        if (netsSorted.length === 0)
+            return false;
+        focusIndex = Nav.page(focusIndex, netsSorted.length, dir, 8, true);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function edgeFocus(dir) {
+        if (netsSorted.length === 0)
+            return false;
+        focusIndex = Nav.edge(netsSorted.length, dir);
+        ensureFocusVisible();
+        return true;
+    }
+
+    function activateFocused() {
+        var net = focusNet();
+        if (!net)
+            return false;
+        if (expandedSsid === net.name) {
+            if (net.connected)
+                disconnectNetwork(net);
+            else if (knownProfiles[net.name])
+                connectKnown(net);
+            else
+                return false; // the password fields own Enter
+            return true;
+        }
+        activateNetwork(net);
+        return true;
+    }
+
+    function kbStep(dir) { return moveFocus(dir); }
+    function kbPage(dir) { return pageFocus(dir); }
+    function kbEdge(dir) { return edgeFocus(dir); }
+    function kbCycle(dir) { return moveFocus(dir); }
+    function kbActivate() { return activateFocused(); }
+    function kbBack() {
+        if (expandedSsid.length > 0) {
+            expandedSsid = "";
+            hidePassword();
+            return true;
+        }
+        return false;
+    }
+    function kbLetter(letter) {
+        if (letter === "j") return moveFocus(1);
+        if (letter === "k") return moveFocus(-1);
+        if (letter === "r") {
+            scanning ? stopScan() : startScan();
+            return true;
+        }
+        return false;
     }
 
     function refresh() {
@@ -319,6 +401,7 @@ PillSurface {
 
     onActiveChanged: {
         if (active) {
+            focusIndex = 0;
             refresh();
             refreshHotspot();
             startScan();
@@ -633,7 +716,12 @@ PillSurface {
         }
     }
 
-    onNetsChanged: if (active) secRefresh.restart()
+    onNetsChanged: {
+        if (focusIndex >= netsSorted.length)
+            focusIndex = Math.max(0, netsSorted.length - 1);
+        if (active)
+            secRefresh.restart();
+    }
 
     Timer {
         id: secRefresh
@@ -769,7 +857,9 @@ PillSurface {
                     Column {
                         id: netItem
                         required property var modelData
+                        required property int index
                         readonly property string ssid: (modelData && modelData.name) ? modelData.name : ""
+                        readonly property bool focused: root.focusIndex === index
                         readonly property bool isActive: modelData ? modelData.connected === true : false
                         readonly property bool secured: root.isSecured(ssid)
                         readonly property bool enterprise: root.isEnterprise(ssid)
@@ -797,14 +887,17 @@ PillSurface {
                             height: 30 * root.s
                             radius: 9 * root.s
                             color: netItem.isActive ? Qt.rgba(Theme.verm.r, Theme.verm.g, Theme.verm.b, 0.14)
-                                : (rowHover.hovered ? Theme.frameBg : "transparent")
+                                : ((rowHover.hovered || netItem.focused) ? Theme.frameBg : "transparent")
 
                             HoverHandler { id: rowHover }
 
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.activateNetwork(netItem.modelData)
+                                onClicked: {
+                                    root.focusIndex = netItem.index;
+                                    root.activateNetwork(netItem.modelData);
+                                }
                             }
 
                             Text {

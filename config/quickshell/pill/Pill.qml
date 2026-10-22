@@ -77,6 +77,7 @@ Item {
     readonly property bool animationOpen: surface === "animation"
     readonly property bool fontpickerOpen: surface === "fontpicker"
     readonly property bool menuOpen: surface === "menu"
+    readonly property bool keysOpen: surface === "keys"
     readonly property bool settingsLike: settingsOpen || appearanceOpen || updatesOpen
         || lookOpen || inputOpen || displayOpen || animationOpen || idlelockOpen || fontpickerOpen
     readonly property bool hasMedia: Players.list.length > 0
@@ -194,6 +195,7 @@ Item {
     readonly property real animationW: 392 * s
     readonly property real fontpickerW: 360 * s
     readonly property real menuW: 380 * s
+    readonly property real keysW: 392 * s
     readonly property real toastW: 342 * s
     readonly property real quickChooseW: 344 * s
     readonly property real quickChooseH: 76 * s
@@ -258,8 +260,117 @@ Item {
         idlelock:   { size: () => Qt.size(idlelockW, surfaceItem(ldIdlelock).implicitHeight + 29 * s), ame: () => surfaceItem(ldIdlelock) },
         animation:  { size: () => Qt.size(animationW, surfaceItem(ldAnimation).implicitHeight + 29 * s), ame: () => surfaceItem(ldAnimation) },
         fontpicker: { size: () => Qt.size(fontpickerW, surfaceItem(ldFontpicker).implicitHeight + 29 * s), ame: () => surfaceItem(ldFontpicker) },
-        menu:       { size: () => Qt.size(menuW, surfaceItem(ldMenu).implicitHeight + 29 * s), ame: () => surfaceItem(ldMenu) }
+        menu:       { size: () => Qt.size(menuW, surfaceItem(ldMenu).implicitHeight + 29 * s), ame: () => surfaceItem(ldMenu) },
+        keys:       { size: () => Qt.size(keysW, surfaceItem(ldKeys).implicitHeight + 29 * s), ame: () => surfaceItem(ldKeys) }
     })
+
+    /**
+     * Open surface item per name, for keyboard routing. Kept beside the geometry
+     * table so a surface that implements the PillSurface nav contract is one
+     * entry here; the thunks resolve through `surfaceItem` only while the loader
+     * is already open, so they never wake a cold surface.
+     */
+    readonly property var navSurfaces: ({
+        calendar:   () => surfaceItem(ldCalendar),
+        launcher:   () => surfaceItem(ldLauncher),
+        clipboard:  () => surfaceItem(ldClip),
+        wallpaper:  () => surfaceItem(ldWall),
+        power:      () => surfaceItem(ldPower),
+        media:      () => surfaceItem(ldMedia),
+        mixer:      () => surfaceItem(ldMixer),
+        link:       () => surfaceItem(ldLink),
+        wifi:       () => surfaceItem(ldWifi),
+        sound:      () => surfaceItem(ldSound),
+        bt:         () => surfaceItem(ldBt),
+        battery:    () => surfaceItem(ldBattery),
+        settings:   () => surfaceItem(ldSettings),
+        keybinds:   () => surfaceItem(ldKeybinds),
+        workspaces: () => surfaceItem(ldWorkspaces),
+        stash:      () => surfaceItem(ldStash),
+        spaceapps:  () => surfaceItem(ldSpaceapps),
+        recorder:   () => surfaceItem(ldRecorder),
+        sysmon:     () => surfaceItem(ldSysmon),
+        appearance: () => surfaceItem(ldAppearance),
+        updates:    () => surfaceItem(ldUpdates),
+        display:    () => surfaceItem(ldDisplay),
+        input:      () => surfaceItem(ldInput),
+        look:       () => surfaceItem(ldLook),
+        idlelock:   () => surfaceItem(ldIdlelock),
+        animation:  () => surfaceItem(ldAnimation),
+        fontpicker: () => surfaceItem(ldFontpicker),
+        menu:       () => surfaceItem(ldMenu),
+        keys:       () => surfaceItem(ldKeys)
+    })
+
+    function navTarget() {
+        var f = pill.navSurfaces[pill.surface];
+        return f ? f() : null;
+    }
+
+    /**
+     * Call METHOD on the open surface when it implements it. Returns true only
+     * when the surface consumed the key, so the host can leave it unaccepted
+     * and let another layer (a text field, the compositor) see it.
+     */
+    function navCall(method, arg) {
+        var it = pill.navTarget();
+        if (!it || typeof it[method] !== "function")
+            return false;
+        return it[method](arg) === true;
+    }
+
+    /**
+     * The single keymap every surface speaks. Surfaces own the selection; this
+     * only translates keys. Space is an alias for Enter except inside a search
+     * field, which never reaches here.
+     */
+    function navKey(key, mods) {
+        var ctrl = (mods & Qt.ControlModifier) !== 0;
+        var shift = (mods & Qt.ShiftModifier) !== 0;
+        var alt = (mods & Qt.AltModifier) !== 0;
+        if (alt && key >= Qt.Key_1 && key <= Qt.Key_9)
+            return pill.navCall("kbNumber", key - Qt.Key_0);
+        if (key === Qt.Key_Up)
+            return pill.navCall("kbStep", -1);
+        if (key === Qt.Key_Down)
+            return pill.navCall("kbStep", 1);
+        if (key === Qt.Key_Left)
+            return pill.navCall("kbAdjust", -1);
+        if (key === Qt.Key_Right)
+            return pill.navCall("kbAdjust", 1);
+        if (key === Qt.Key_PageUp)
+            return pill.navCall("kbPage", -1);
+        if (key === Qt.Key_PageDown)
+            return pill.navCall("kbPage", 1);
+        if (key === Qt.Key_Home && ctrl)
+            return pill.navCall("kbEdge", -1);
+        if (key === Qt.Key_End && ctrl)
+            return pill.navCall("kbEdge", 1);
+        if (key === Qt.Key_Delete)
+            return pill.navCall("kbDelete");
+        if (key === Qt.Key_Tab || key === Qt.Key_Backtab)
+            return pill.navCall("kbCycle", (key === Qt.Key_Backtab || shift) ? -1 : 1);
+        if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space) {
+            if (shift && pill.navCall("kbRange"))
+                return true;
+            return pill.navCall("kbActivate");
+        }
+        if (!ctrl && !alt && !shift && key >= Qt.Key_A && key <= Qt.Key_Z)
+            return pill.navCall("kbLetter", String.fromCharCode(key).toLowerCase());
+        return false;
+    }
+
+    /**
+     * Escape's back stack: let the surface pop its own layer (query, editor,
+     * expanded row) first, then the parent-surface rules in surfaceBack, then
+     * close the pill.
+     */
+    function back() {
+        var it = pill.navTarget();
+        if (it && typeof it.kbBack === "function" && it.kbBack())
+            return;
+        pill.surfaceBack();
+    }
 
     readonly property string mode: dragActive ? "dragOver"
         : (surfaceOpen && surfaces[surface] !== undefined ? surface
@@ -2298,6 +2409,18 @@ Item {
             morphCloseness: pill.morphCloseness
             onRequestClose: pill.requestClose()
             onRequestSurface: (name) => pill.requestSurface(name)
+        }
+    }
+
+    Loader {
+        id: ldKeys
+        active: false
+        anchors.fill: parent
+        sourceComponent: KeysSurface {
+            s: pill.s
+            open: pill.keysOpen
+            morphCloseness: pill.morphCloseness
+            onRequestClose: pill.requestClose()
         }
     }
 

@@ -113,18 +113,15 @@ PillSurface {
         && viewYear === today.getFullYear()
 
     /**
-     * Ame is the focus cursor: it rings the picked day, or today when this month
-     * is in view with nothing picked. Browsing another month with nothing picked
-     * leaves no focus, so the bead parks as a soul ember on the 暦 header glyph
-     * (the calendar's lantern, mirroring Sysmon) rather than floating over a
-     * random date cell — which is what read as Ame jumping somewhere random.
+     * Ame is the focus cursor: a keyboard cursor day, falling back to today
+     * when this month is in view. Arrow keys move the cursor independently of
+     * the selected day, so browsing never opens the editor; Enter commits.
      */
-    readonly property bool selectedInView: selectedDate.length > 0
-        && Number(selectedDate.split("-")[1]) === viewMonth + 1
-        && Number(selectedDate.split("-")[0]) === viewYear
-    readonly property int focusDay: selectedInView
-        ? Number(selectedDate.split("-")[2])
-        : (todayVisible ? today.getDate() : 0)
+    property string cursorDate: ""
+    readonly property bool cursorInView: cursorDate.length > 0
+        && Number(cursorDate.split("-")[1]) === viewMonth + 1
+        && Number(cursorDate.split("-")[0]) === viewYear
+    readonly property int focusDay: cursorInView ? Number(cursorDate.split("-")[2]) : 0
     readonly property bool focused: focusDay > 0
     readonly property int focusIndex: offset + focusDay - 1
     readonly property real cellW: grid.width / 7
@@ -164,10 +161,54 @@ PillSurface {
 
     /** "YYYY-MM-DD" for a day number in the viewed month, zero-padded for keys. */
     function dateKey(day) {
-        var m = viewMonth + 1;
+        return keyFor(viewYear, viewMonth, day);
+    }
+
+    function keyFor(year, month, day) {
+        var m = month + 1;
         var mm = m < 10 ? "0" + m : "" + m;
         var dd = day < 10 ? "0" + day : "" + day;
-        return viewYear + "-" + mm + "-" + dd;
+        return year + "-" + mm + "-" + dd;
+    }
+
+    function daysFor(year, month) {
+        return new Date(year, month + 1, 0).getDate();
+    }
+
+    function cursorDateObject() {
+        var p = cursorDate.split("-");
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+
+    function setCursor(year, month, day) {
+        viewYear = year;
+        viewMonth = month;
+        cursorDate = keyFor(year, month, day);
+    }
+
+    /** Move the keyboard cursor by DAYS, rolling the viewed month with it. */
+    function moveCursor(days) {
+        var d = cursorDate.length ? cursorDateObject() : today;
+        d.setDate(d.getDate() + days);
+        setCursor(d.getFullYear(), d.getMonth(), d.getDate());
+        hoverDay = 0;
+    }
+
+    /** Browse months without disturbing the selection; clamp the cursor day. */
+    function moveMonth(delta) {
+        var m = viewMonth + delta;
+        var y = viewYear;
+        while (m < 0) { m += 12; y -= 1; }
+        while (m > 11) { m -= 12; y += 1; }
+        var day = Math.min(focusDay > 0 ? focusDay : 1, daysFor(y, m));
+        setCursor(y, m, day);
+        hoverDay = 0;
+    }
+
+    function moveWeekEdge(dir) {
+        var d = cursorDate.length ? cursorDateObject() : today;
+        var dow = (d.getDay() + 6) % 7;
+        moveCursor(dir < 0 ? -dow : 6 - dow);
     }
 
     function shiftMonth(delta) {
@@ -187,6 +228,7 @@ PillSurface {
     function resetToday() {
         viewYear = today.getFullYear();
         viewMonth = today.getMonth();
+        cursorDate = keyFor(viewYear, viewMonth, today.getDate());
         selectedDate = "";
         selEndDate = "";
         pickingEnd = false;
@@ -223,6 +265,79 @@ PillSurface {
     }
 
     onActiveChanged: if (active) resetToday()
+
+    function kbStep(dir) {
+        moveCursor(dir * 7);
+        return true;
+    }
+
+    function kbAdjust(dir) {
+        moveCursor(dir);
+        return true;
+    }
+
+    function kbPage(dir) {
+        moveMonth(dir);
+        return true;
+    }
+
+    function kbEdge(dir) {
+        moveWeekEdge(dir);
+        return true;
+    }
+
+    function kbCycle(dir) {
+        moveCursor(dir);
+        return true;
+    }
+
+    function kbActivate() {
+        if (focusDay <= 0)
+            return false;
+        selectDay(focusDay);
+        return true;
+    }
+
+    /** Shift+Enter arms or closes a range; plain Enter toggles a day. */
+    function kbRange() {
+        if (focusDay <= 0)
+            return false;
+        if (!pickingEnd) {
+            if (selectedDate !== dateKey(focusDay))
+                selectDay(focusDay);
+            pickingEnd = true;
+            hoverDay = focusDay;
+            return true;
+        }
+        selectDay(focusDay);
+        return true;
+    }
+
+    function kbBack() {
+        if (pickingEnd) {
+            pickingEnd = false;
+            hoverDay = 0;
+            return true;
+        }
+        if (selectedDate.length > 0) {
+            selectedDate = "";
+            selEndDate = "";
+            return true;
+        }
+        return false;
+    }
+
+    function kbLetter(letter) {
+        if (letter === "t") {
+            resetToday();
+            return true;
+        }
+        if (letter === "j") return kbStep(1);
+        if (letter === "k") return kbStep(-1);
+        if (letter === "h") return kbAdjust(-1);
+        if (letter === "l") return kbAdjust(1);
+        return false;
+    }
 
     Item {
         id: weather
@@ -605,6 +720,7 @@ PillSurface {
                     readonly property bool inMonth: dayNum >= 1 && dayNum <= root.monthLen
                     readonly property bool current: inMonth && root.isToday(dayNum)
                     readonly property string dayKey: inMonth ? root.dateKey(dayNum) : ""
+                    readonly property bool focused: inMonth && cell.dayKey === root.cursorDate
                     readonly property bool hasEvent: inMonth && Events.hasEvents(cell.dayKey)
                     readonly property bool sel: inMonth && root.inRange(cell.dayKey)
                     readonly property bool selEdge: cell.sel
@@ -618,8 +734,10 @@ PillSurface {
                         width: 22 * root.s
                         height: 22 * root.s
                         radius: Motion.rSmall * root.s
-                        color: cellArea.containsMouse && cell.inMonth && !cell.current
-                            ? Qt.rgba(0.94, 0.88, 0.84, 0.04) : "transparent"
+                        color: (cell.focused || (cellArea.containsMouse && cell.inMonth && !cell.current))
+                            ? Qt.rgba(0.94, 0.88, 0.84, 0.06) : "transparent"
+                        border.width: cell.focused ? 1 : 0
+                        border.color: Qt.alpha(Theme.vermLit, 0.45)
                     }
 
                     Rectangle {

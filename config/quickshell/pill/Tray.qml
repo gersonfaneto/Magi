@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * System tray. Draws StatusNotifier items as warm-tinted icons. Left-click
@@ -121,6 +122,7 @@ Item {
         property var entryData
         property real indent: 0
         property bool expanded: false
+        property bool focused: false
         signal activated()
 
         height: entryData.isSeparator ? 9 * tray.s : 32 * tray.s
@@ -141,7 +143,7 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: mrow.indent
             radius: 8 * tray.s
-            color: mrowArea.containsMouse && mrow.entryData.enabled
+            color: (mrowArea.containsMouse || mrow.focused) && mrow.entryData.enabled
                 ? Theme.frameBg : "transparent"
 
             Rectangle {
@@ -152,7 +154,7 @@ Item {
                 height: parent.height * 0.46
                 radius: width / 2
                 color: Theme.vermLit
-                opacity: mrowArea.containsMouse && mrow.entryData.enabled ? 1 : 0
+                opacity: (mrowArea.containsMouse || mrow.focused) && mrow.entryData.enabled ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.fast } }
             }
 
@@ -207,7 +209,7 @@ Item {
                 anchors.rightMargin: 14 * tray.s
                 text: mrow.entryData.text
                 color: !mrow.entryData.enabled ? Theme.dim
-                    : (mrowArea.containsMouse ? Theme.cream : Theme.creamMenu)
+                    : ((mrowArea.containsMouse || mrow.focused) ? Theme.cream : Theme.creamMenu)
                 font.family: Theme.font
                 font.pixelSize: 13 * tray.s
                 font.weight: mrowArea.containsMouse ? Font.DemiBold : Font.Normal
@@ -273,7 +275,28 @@ Item {
             anchors.fill: parent
             focus: menu.open
 
-            Keys.onEscapePressed: menu.open = false
+            Keys.onEscapePressed: {
+                if (card.expandedIdx >= 0)
+                    card.expandedIdx = -1;
+                else
+                    menu.open = false;
+            }
+            Keys.onUpPressed: card.moveFocus(-1)
+            Keys.onDownPressed: card.moveFocus(1)
+            Keys.onReturnPressed: card.activateFocused()
+            Keys.onEnterPressed: card.activateFocused()
+            Keys.onSpacePressed: card.activateFocused()
+            Keys.onRightPressed: card.expandFocused()
+            Keys.onLeftPressed: card.expandedIdx = -1
+            Keys.onPressed: (e) => {
+                if ((e.modifiers & Qt.ControlModifier) && e.key === Qt.Key_Home) {
+                    card.focusIdx = 0;
+                    e.accepted = true;
+                } else if ((e.modifiers & Qt.ControlModifier) && e.key === Qt.Key_End) {
+                    card.focusIdx = Math.max(0, card.entryCount - 1);
+                    e.accepted = true;
+                }
+            }
 
             Rectangle {
                 id: card
@@ -292,6 +315,35 @@ Item {
                 border.color: Theme.border
 
                 property int expandedIdx: -1
+                property int focusIdx: 0
+                readonly property var entries: opener.children ? opener.children.values : []
+                readonly property int entryCount: entries.length
+
+                function moveFocus(dir) {
+                    if (entryCount === 0)
+                        return;
+                    focusIdx = Nav.step(focusIdx, entryCount, dir, true);
+                }
+
+                function activateFocused() {
+                    var e = entries[focusIdx];
+                    if (!e || !e.enabled)
+                        return;
+                    if (e.hasChildren) {
+                        expandedIdx = expandedIdx === focusIdx ? -1 : focusIdx;
+                        return;
+                    }
+                    e.triggered();
+                    menu.open = false;
+                }
+
+                function expandFocused() {
+                    var e = entries[focusIdx];
+                    if (e && e.hasChildren)
+                        expandedIdx = focusIdx;
+                }
+
+                onEntryCountChanged: if (focusIdx >= entryCount) focusIdx = Math.max(0, entryCount - 1)
 
                 implicitHeight: col.implicitHeight + 12 * tray.s
                 height: implicitHeight
@@ -334,6 +386,7 @@ Item {
                             required property var modelData
                             required property int index
                             readonly property bool expanded: card.expandedIdx === index
+                            readonly property bool focused: card.focusIdx === index
 
                             width: col.width
 
@@ -341,6 +394,7 @@ Item {
                                 width: parent.width
                                 entryData: entry.modelData
                                 expanded: entry.expanded
+                                focused: entry.focused
                                 onActivated: {
                                     if (entry.modelData.hasChildren) {
                                         card.expandedIdx = entry.expanded ? -1 : entry.index;

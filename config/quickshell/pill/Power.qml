@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Widgets
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * Power surface: a row of hand-drawn session glyphs split by a hairline into a
@@ -71,10 +72,8 @@ PillSurface {
      */
     function move(dir) {
         keyHeld = false;
-        if (focusIndex < 0)
-            focusIndex = dir > 0 ? 0 : actions.length - 1;
-        else
-            focusIndex = Math.max(0, Math.min(actions.length - 1, focusIndex + dir));
+        focusIndex = Nav.step(focusIndex, actions.length, dir, true);
+        return true;
     }
 
     /**
@@ -100,6 +99,17 @@ PillSurface {
     function releaseFocused() {
         keyHeld = false;
     }
+
+    function kbStep(dir) { return move(dir); }
+    function kbAdjust(dir) { return move(dir); }
+    function kbPage(dir) { return move(dir); }
+    function kbEdge(dir) {
+        keyHeld = false;
+        focusIndex = Nav.edge(actions.length, dir);
+        return true;
+    }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { return pressFocused(); }
 
     onActiveChanged: if (!active) {
         hovered = "";

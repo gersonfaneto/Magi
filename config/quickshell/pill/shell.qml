@@ -391,73 +391,74 @@ ShellRoot {
                 HoverHandler {
                     onHoveredChanged: pill.hovered = hovered
                 }
-                Keys.onEscapePressed: {
-                    if (pill.menuOpen) {
-                        pill.menuCancel();
-                    } else if (pill.quickChoosing) {
-                        ScreenRec.quickChoosing = false;
-                        ScreenRec.quickScreenChoosing = false;
-                    } else if (!pill.keybindsBack()) {
-                        root.close();
-                    }
-                }
-                Keys.onUpPressed: (e) => {
-                    if (pill.keybindsOpen && !pill.keybindsListening) { pill.keybindsMove(-1); e.accepted = true; return; }
-                    if (pill.menuOpen) { pill.menuMove(-1); e.accepted = true; return; }
-                    e.accepted = pill.mixerStep(1) || pill.recorderStep(5) || pill.settingsMove(-1);
-                }
-                Keys.onDownPressed: (e) => {
-                    if (pill.keybindsOpen && !pill.keybindsListening) { pill.keybindsMove(1); e.accepted = true; return; }
-                    if (pill.menuOpen) { pill.menuMove(1); e.accepted = true; return; }
-                    e.accepted = pill.mixerStep(-1) || pill.recorderStep(-5) || pill.settingsMove(1);
-                }
-                Keys.onLeftPressed: (e) => {
-                    if (pill.mixerOpen) { pill.mixerFocusMove(-1); e.accepted = true; }
-                    else if (pill.wallpaperOpen) { pill.wallpaperMove(-1); e.accepted = true; }
-                    else if (pill.powerOpen) { pill.powerMove(-1); e.accepted = true; }
-                    else if (pill.recorderOpen) { e.accepted = pill.recorderStep(-5); }
-                    else if (pill.settingsLike) { pill.settingsAdjust(-1); e.accepted = true; }
-                }
-                Keys.onRightPressed: (e) => {
-                    if (pill.mixerOpen) { pill.mixerFocusMove(1); e.accepted = true; }
-                    else if (pill.wallpaperOpen) { pill.wallpaperMove(1); e.accepted = true; }
-                    else if (pill.powerOpen) { pill.powerMove(1); e.accepted = true; }
-                    else if (pill.recorderOpen) { e.accepted = pill.recorderStep(5); }
-                    else if (pill.settingsLike) { pill.settingsAdjust(1); e.accepted = true; }
+
+                /**
+                 * True while a TextInput/TextField owns focus. Such a field
+                 * handles arrows, Enter and typing itself; navigation must not
+                 * also move the surface cursor underneath it.
+                 */
+                readonly property bool textFocused: {
+                    const it = focusScope.activeFocusItem;
+                    return !!it && it.cursorPosition !== undefined && it.text !== undefined;
                 }
 
                 /**
-                 * Return/Enter/Space: the wallpaper strip applies its focused
-                 * thumb on every press; the power surface fires a safe tile on
-                 * the first press and, for a destructive tile, holds the heat
-                 * fill across autorepeat presses (drained on release). Autorepeat
-                 * is swallowed for everything else so a held key never re-fires.
+                 * All keyboard routing goes through `Pill.navKey`, which asks
+                 * the open surface's PillSurface contract. A search field owns
+                 * its keys first; this scope sees whatever bubbles past it.
                  */
                 Keys.onPressed: (e) => {
+                    var alt = (e.modifiers & Qt.AltModifier) !== 0;
+                    var ctrl = (e.modifiers & Qt.ControlModifier) !== 0;
+
+                    // Ctrl+/ toggles the keyboard reference from anywhere.
+                    if (ctrl && (e.key === Qt.Key_Slash || e.key === Qt.Key_Question)
+                        && !pill.keybindsListening) {
+                        if (pill.keysOpen)
+                            pill.requestClose();
+                        else
+                            pill.requestSurface("keys");
+                        e.accepted = true;
+                        return;
+                    }
+
+                    // Bare typing over the wallpaper strip opens its search.
                     if (pill.wallpaperOpen && !pill.wallpaperSearching
+                        && !ctrl && !alt
                         && e.text.length === 1 && e.text > " ") {
                         pill.wallpaperType(e.text);
                         e.accepted = true;
                         return;
                     }
-                    if (e.key !== Qt.Key_Return && e.key !== Qt.Key_Enter && e.key !== Qt.Key_Space)
+
+                    if (e.key === Qt.Key_Escape) {
+                        if (pill.quickChoosing) {
+                            ScreenRec.quickChoosing = false;
+                            ScreenRec.quickScreenChoosing = false;
+                            e.accepted = true;
+                            return;
+                        }
+                        // The keybinds chord catcher has focus and owns Escape.
+                        if (pill.keybindsListening)
+                            return;
+                        pill.back();
+                        e.accepted = true;
                         return;
-                    if (pill.menuOpen) {
-                        if (!e.isAutoRepeat) pill.menuActivate();
-                        e.accepted = true;
-                    } else if (pill.wallpaperOpen) {
-                        if (!e.isAutoRepeat) pill.wallpaperActivate();
-                        e.accepted = true;
-                    } else if (pill.powerOpen) {
-                        if (!e.isAutoRepeat) pill.powerPress();
-                        e.accepted = true;
-                    } else if (pill.settingsLike) {
-                        if (!e.isAutoRepeat) pill.settingsActivate();
-                        e.accepted = true;
-                    } else if (pill.keybindsOpen && !pill.keybindsListening) {
-                        if (!e.isAutoRepeat) pill.keybindsActivate();
-                        e.accepted = true;
                     }
+
+                    if (focusScope.textFocused)
+                        return;
+
+                    // A held Enter/Space must not re-fire an action; the power
+                    // surface reads the release to drain a destructive hold.
+                    if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space)
+                        && e.isAutoRepeat) {
+                        e.accepted = true;
+                        return;
+                    }
+
+                    if (pill.navKey(e.key, e.modifiers))
+                        e.accepted = true;
                 }
                 Keys.onReleased: (e) => {
                     if (e.isAutoRepeat)

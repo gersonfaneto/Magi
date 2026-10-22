@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * Wallpaper surface: a filmstrip over the wallpaper directory, rendered as one
@@ -188,9 +189,45 @@ PillSurface {
 
     function move(delta) {
         if (itemCount === 0)
-            return;
-        focusIndex = Math.max(0, Math.min(itemCount - 1, focusIndex + delta));
+            return false;
+        focusIndex = Nav.step(focusIndex, itemCount, delta, true);
+        return true;
     }
+
+    function page(dir) {
+        if (itemCount === 0)
+            return false;
+        focusIndex = Nav.page(focusIndex, itemCount, dir, 5, true);
+        return true;
+    }
+
+    function edge(dir) {
+        if (itemCount === 0)
+            return false;
+        focusIndex = Nav.edge(itemCount, dir);
+        return true;
+    }
+
+    /** Escape leaves search first, then the inline folder edit. */
+    function back() {
+        if (root.searching) {
+            root.exitSearch();
+            return true;
+        }
+        if (root.editingDir) {
+            root.editingDir = false;
+            return true;
+        }
+        return false;
+    }
+
+    function kbStep(dir) { return move(dir); }
+    function kbAdjust(dir) { return move(dir); }
+    function kbPage(dir) { return page(dir); }
+    function kbEdge(dir) { return edge(dir); }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { activate(); return true; }
+    function kbBack() { return back(); }
 
     FrameAnimation {
         running: root.active && root.pos !== root.focusIndex
@@ -444,6 +481,9 @@ PillSurface {
             debounce.restart();
         }
         onMoved: (d) => root.move(d)
+        onPaged: (d) => root.page(d)
+        onJumped: (d) => root.edge(d)
+        onCycled: (d) => root.move(d)
         onAccepted: root.activate()
         onDismissed: root.exitSearch()
         onKeyPressed: (e) => {

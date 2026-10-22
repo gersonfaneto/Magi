@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * 字 FONT sub-surface: a searchable list of every installed family, each row
@@ -73,19 +74,56 @@ SettingsSurface {
         Flags.uiFont = family;
     }
 
-    /** Slide the keyboard highlight by dir (+1 down, -1 up), clamped and kept in view. */
+    /** Slide the keyboard highlight by dir, wrapping and keeping it in view. */
     function move(dir) {
         if (root.families.length === 0)
-            return;
-        root.focusIndex = Math.max(0, Math.min(root.families.length - 1, root.focusIndex + dir));
+            return false;
+        root.focusIndex = Nav.step(root.focusIndex, root.families.length, dir, true);
         list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
+    }
+
+    readonly property int pageRows: Math.max(1, Math.floor(list.height / (36 * root.s)))
+
+    function page(dir) {
+        if (root.families.length === 0)
+            return false;
+        root.focusIndex = Nav.page(root.focusIndex, root.families.length, dir, pageRows, true);
+        list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
+    }
+
+    function edge(dir) {
+        if (root.families.length === 0)
+            return false;
+        root.focusIndex = Nav.edge(root.families.length, dir);
+        list.positionViewAtIndex(root.focusIndex, ListView.Contain);
+        return true;
     }
 
     function activate() {
         if (root.focusIndex < 0 || root.focusIndex >= root.families.length)
-            return;
+            return false;
         root.pick(root.families[root.focusIndex].family);
+        return true;
     }
+
+    function back() {
+        if (root.query.length > 0 || searchField.text.length > 0) {
+            searchField.text = "";
+            root.query = "";
+            root.focusIndex = 0;
+            return true;
+        }
+        return false;
+    }
+
+    function kbStep(dir) { return move(dir); }
+    function kbPage(dir) { return page(dir); }
+    function kbEdge(dir) { return edge(dir); }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { return activate(); }
+    function kbBack() { return back(); }
 
     onActiveChanged: {
         if (active) {
@@ -134,6 +172,9 @@ SettingsSurface {
                 root.focusIndex = 0;
             }
             onMoved: (d) => root.move(d)
+            onPaged: (d) => root.page(d)
+            onJumped: (d) => root.edge(d)
+            onCycled: (d) => root.move(d)
             onAccepted: root.activate()
         }
 

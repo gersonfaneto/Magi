@@ -50,7 +50,19 @@ PillSurface {
         content.closeAdd();
     }
 
-    onActiveChanged: content.closeAdd()
+    onActiveChanged: {
+        content.focusIndex = 0;
+        content.closeAdd();
+    }
+
+    function kbStep(dir) { return content.kbStep(dir); }
+    function kbPage(dir) { return content.kbPage(dir); }
+    function kbEdge(dir) { return content.kbEdge(dir); }
+    function kbCycle(dir) { return content.kbCycle(dir); }
+    function kbActivate() { return content.kbActivate(); }
+    function kbDelete() { return content.kbDelete(); }
+    function kbBack() { return content.kbBack(); }
+    function kbLetter(letter) { return content.kbLetter(letter); }
 
     AppRouteList {
         id: content

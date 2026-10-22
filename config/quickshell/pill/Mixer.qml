@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * Mixer surface: header with DND / Keep-Awake chips and a row of four vertical
@@ -149,9 +150,30 @@ PillSurface {
      * (right) or -1 (left); a fresh focus lands on the first or last fader.
      */
     function moveFocus(dir) {
-        focusIndex = focusIndex < 0 ? (dir > 0 ? 0 : faders.length - 1)
-                                    : (focusIndex + dir + faders.length) % faders.length;
+        if (faders.length === 0)
+            return false;
+        focusIndex = Nav.step(focusIndex, faders.length, dir, true);
         keyLatch.restart();
+        return true;
+    }
+
+    function kbStep(dir) { return stepFocused(-dir); }
+    function kbAdjust(dir) { return moveFocus(dir); }
+    function kbPage(dir) { return stepFocused(-dir * 10); }
+    function kbEdge(dir) {
+        if (faders.length === 0)
+            return false;
+        focusIndex = Nav.edge(faders.length, dir);
+        keyLatch.restart();
+        return true;
+    }
+    function kbCycle(dir) { return moveFocus(dir); }
+    function kbBack() {
+        if (openPicker.length > 0) {
+            openPicker = "";
+            return true;
+        }
+        return false;
     }
 
     Component.onCompleted: Devices.detect()

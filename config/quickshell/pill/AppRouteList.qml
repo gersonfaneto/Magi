@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /** Body of the class-routing surfaces (Stash, SpaceApps); the surface owns the data and gets removed(index) / picked(entry). */
 Column {
@@ -13,10 +14,58 @@ Column {
     property string title: ""
     property string emptyText: ""
     property var entries: []
+    property int focusIndex: 0
 
     readonly property alias addOpen: picker.addOpen
     function closeAdd() { picker.closeAdd(); }
+    function openAdd() { picker.openAdd(); }
     function normalizeClass(cls) { return picker.normalizeClass(cls); }
+
+    onEntriesChanged: if (focusIndex >= entries.length) focusIndex = Math.max(0, entries.length - 1)
+
+    function moveFocus(dir) {
+        if (entries.length === 0)
+            return false;
+        focusIndex = Nav.step(focusIndex, entries.length, dir, true);
+        list.positionViewAtIndex(focusIndex, ListView.Contain);
+        return true;
+    }
+
+    function pageFocus(dir) {
+        if (entries.length === 0)
+            return false;
+        focusIndex = Nav.page(focusIndex, entries.length, dir, 5, true);
+        list.positionViewAtIndex(focusIndex, ListView.Contain);
+        return true;
+    }
+
+    function edgeFocus(dir) {
+        if (entries.length === 0)
+            return false;
+        focusIndex = Nav.edge(entries.length, dir);
+        list.positionViewAtIndex(focusIndex, ListView.Contain);
+        return true;
+    }
+
+    function kbStep(dir) { return picker.addOpen ? picker.kbStep(dir) : moveFocus(dir); }
+    function kbPage(dir) { return picker.addOpen ? picker.kbPage(dir) : pageFocus(dir); }
+    function kbEdge(dir) { return picker.addOpen ? picker.kbEdge(dir) : edgeFocus(dir); }
+    function kbCycle(dir) { return picker.addOpen ? picker.kbCycle(dir) : moveFocus(dir); }
+    function kbActivate() { return picker.addOpen ? picker.kbActivate() : false; }
+    function kbDelete() {
+        if (picker.addOpen || focusIndex < 0 || focusIndex >= entries.length)
+            return false;
+        body.removed(focusIndex);
+        return true;
+    }
+    function kbBack() { return picker.kbBack(); }
+    function kbLetter(letter) {
+        if (letter === "a" && !picker.addOpen) {
+            picker.openAdd();
+            return true;
+        }
+        return false;
+    }
 
     signal removed(int index)
     signal picked(var entry)
@@ -70,6 +119,7 @@ Column {
             }
             readonly property string title: resolved && resolved.name ? resolved.name : modelData
             readonly property bool named: resolved && resolved.name && resolved.name !== modelData
+            readonly property bool focused: body.focusIndex === index
 
             width: ListView.view.width
             height: 46 * body.s
@@ -79,9 +129,9 @@ Column {
                 anchors.topMargin: 3 * body.s
                 anchors.bottomMargin: 3 * body.s
                 radius: 10 * body.s
-                color: rowHover.hovered ? Theme.frameBg : "transparent"
+                color: (rowHover.hovered || erow.focused) ? Theme.frameBg : "transparent"
                 border.width: 1
-                border.color: rowHover.hovered ? Theme.frameBorder : "transparent"
+                border.color: (rowHover.hovered || erow.focused) ? Theme.frameBorder : "transparent"
                 Behavior on color { ColorAnimation { duration: Motion.fast } }
             }
 

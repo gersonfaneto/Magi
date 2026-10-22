@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import "lib/keychord.js" as Chord
+import "lib/nav.js" as Nav
 import "Singletons"
 
 /**
@@ -61,6 +62,10 @@ PillSurface {
     ]
 
     /** Custom spaces only: built-in display-override entries stay out of the list. */
+    readonly property var allRows: spaces.concat(customSpaces)
+
+    property int focusIndex: 0
+
     readonly property var customSpaces: {
         var sl = Spaces.list;
         var out = [];
@@ -206,7 +211,104 @@ PillSurface {
         root.closeForm();
     }
 
+    onAllRowsChanged: if (focusIndex >= allRows.length) focusIndex = Math.max(0, allRows.length - 1)
+
+    function rowAt(i) {
+        return (i >= 0 && i < allRows.length) ? allRows[i] : null;
+    }
+
+    function isCustomRow(row) {
+        return row !== null && spaces.indexOf(row) === -1;
+    }
+
+    function moveFocus(dir) {
+        if (allRows.length === 0)
+            return false;
+        focusIndex = Nav.step(focusIndex, allRows.length, dir, true);
+        return true;
+    }
+
+    function pageFocus(dir) {
+        if (allRows.length === 0)
+            return false;
+        focusIndex = Nav.page(focusIndex, allRows.length, dir, 4, true);
+        return true;
+    }
+
+    function edgeFocus(dir) {
+        if (allRows.length === 0)
+            return false;
+        focusIndex = Nav.edge(allRows.length, dir);
+        return true;
+    }
+
+    function activateFocused() {
+        var row = rowAt(focusIndex);
+        if (!row)
+            return false;
+        if (isCustomRow(row)) {
+            Spaces.editing = row.id;
+            requestSurface("spaceapps");
+            return true;
+        }
+        if (row.surface && row.surface.length > 0) {
+            requestSurface(row.surface);
+            return true;
+        }
+        return false;
+    }
+
+    function kbStep(dir) { return moveFocus(dir); }
+    function kbPage(dir) { return pageFocus(dir); }
+    function kbEdge(dir) { return edgeFocus(dir); }
+    function kbCycle(dir) { return moveFocus(dir); }
+    function kbActivate() { return activateFocused(); }
+    function kbDelete() {
+        var row = rowAt(focusIndex);
+        if (!row || !isCustomRow(row))
+            return false;
+        Spaces.removeSpace(row.id);
+        return true;
+    }
+    function kbBack() {
+        if (listening) {
+            listening = false;
+            rebindId = "";
+            return true;
+        }
+        if (formOpen) {
+            closeForm();
+            return true;
+        }
+        if (editId.length > 0) {
+            closeEdit();
+            return true;
+        }
+        return false;
+    }
+    function kbLetter(letter) {
+        var row = rowAt(focusIndex);
+        if (letter === "a") {
+            openForm();
+            return true;
+        }
+        if (letter === "j") return moveFocus(1);
+        if (letter === "k") return moveFocus(-1);
+        if (!row)
+            return false;
+        if (letter === "e") {
+            openEdit(row.id, isCustomRow(row) ? row.name : builtinName(row), isCustomRow(row) ? glyphFor(row) : builtinGlyph(row));
+            return true;
+        }
+        if (letter === "r" && isCustomRow(row)) {
+            rebind(row.id);
+            return true;
+        }
+        return false;
+    }
+
     onActiveChanged: {
+        focusIndex = 0;
         formOpen = false;
         listening = false;
         conflict = "";
@@ -345,9 +447,9 @@ PillSurface {
                         anchors.topMargin: 3 * root.s
                         anchors.bottomMargin: 3 * root.s
                         radius: 10 * root.s
-                        color: (wrow.editing || (wrow.nav && navHover.hovered)) ? Theme.frameBg : "transparent"
+                        color: (wrow.editing || (wrow.nav && (navHover.hovered || root.focusIndex === wrow.index))) ? Theme.frameBg : "transparent"
                         border.width: 1
-                        border.color: (wrow.editing || (wrow.nav && navHover.hovered)) ? Theme.frameBorder : "transparent"
+                        border.color: (wrow.editing || (wrow.nav && (navHover.hovered || root.focusIndex === wrow.index))) ? Theme.frameBorder : "transparent"
                         Behavior on color { ColorAnimation { duration: Motion.fast } }
                     }
 
@@ -526,9 +628,9 @@ PillSurface {
                         anchors.topMargin: 3 * root.s
                         anchors.bottomMargin: 3 * root.s
                         radius: 10 * root.s
-                        color: (cHover.hovered || crow.editing) ? Theme.frameBg : "transparent"
+                        color: (cHover.hovered || crow.editing || root.focusIndex === root.spaces.length + crow.index) ? Theme.frameBg : "transparent"
                         border.width: 1
-                        border.color: (cHover.hovered || crow.editing) ? Theme.frameBorder : "transparent"
+                        border.color: (cHover.hovered || crow.editing || root.focusIndex === root.spaces.length + crow.index) ? Theme.frameBorder : "transparent"
                         Behavior on color { ColorAnimation { duration: Motion.fast } }
                     }
 

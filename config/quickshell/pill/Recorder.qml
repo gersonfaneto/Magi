@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * 録 RECORD surface: drives gpu-screen-recorder through the ScreenRec singleton,
@@ -61,6 +62,14 @@ PillSurface {
      */
     property int faderFocus: -1
 
+    /** Keyboard focus in the source and monitor choosers. */
+    property int sourceFocus: 0
+    property int monitorFocus: 0
+
+    readonly property var sourceChoices: [
+        { kind: "screen", label: "Screen", glyph: "monitor" },
+        { kind: "window", label: "Window / Region", glyph: "video" }
+    ]
     readonly property point recPoint: {
         void root.width;
         void root.height;
@@ -94,19 +103,21 @@ PillSurface {
     function press() {
         if (ScreenRec.recording) {
             ScreenRec.stop();
-            return;
+            return true;
         }
         if (counting) {
             ScreenRec.cancel();
-            return;
+            return true;
         }
         if (chooserOpen) {
             chooserOpen = false;
             screenChooserOpen = false;
-            return;
+            return true;
         }
         chooserOpen = true;
         screenChooserOpen = false;
+        sourceFocus = 0;
+        return true;
     }
 
     /**
@@ -118,6 +129,7 @@ PillSurface {
         if (kind === "screen") {
             if (ScreenRec.monitors.length > 1) {
                 screenChooserOpen = true;
+                monitorFocus = 0;
                 return;
             }
             ScreenRec.prepareScreen(root.screenName);
@@ -146,6 +158,116 @@ PillSurface {
         }
         if (faderFocus === 1 && ScreenRec.desktopOn && root.sink && root.sink.audio) {
             root.sink.audio.volume = Math.max(0, Math.min(1, root.sink.audio.volume + deltaPct / 100));
+            return true;
+        }
+        return false;
+    }
+
+    /** Enabled fader indices in visual order, used by Tab cycling and edges. */
+    function faderSlots() {
+        var out = [];
+        if (ScreenRec.micOn)
+            out.push(0);
+        if (ScreenRec.desktopOn)
+            out.push(1);
+        return out;
+    }
+
+    function moveSource(dir) {
+        sourceFocus = Nav.step(sourceFocus, sourceChoices.length, dir, true);
+        return true;
+    }
+
+    function moveMonitor(dir) {
+        var n = ScreenRec.monitors.length;
+        if (n === 0)
+            return false;
+        monitorFocus = Nav.step(monitorFocus, n, dir, true);
+        monList.positionViewAtIndex(monitorFocus, ListView.Contain);
+        return true;
+    }
+
+    function cycleFader(dir) {
+        var slots = faderSlots();
+        if (slots.length === 0)
+            return false;
+        var at = slots.indexOf(faderFocus);
+        var next = at < 0 ? (dir > 0 ? 0 : slots.length - 1)
+                          : (at + dir + slots.length) % slots.length;
+        faderFocus = slots[next];
+        return true;
+    }
+
+    function kbStep(dir) {
+        if (screenChooserOpen)
+            return moveMonitor(dir);
+        if (chooserOpen)
+            return moveSource(dir);
+        return stepFocused(-dir);
+    }
+
+    function kbAdjust(dir) {
+        if (screenChooserOpen)
+            return moveMonitor(dir);
+        if (chooserOpen)
+            return moveSource(dir);
+        return stepFocused(dir * 5);
+    }
+
+    function kbPage(dir) {
+        if (screenChooserOpen || chooserOpen)
+            return kbStep(dir);
+        return stepFocused(-dir * 10);
+    }
+
+    function kbEdge(dir) {
+        if (chooserOpen) {
+            sourceFocus = Nav.edge(sourceChoices.length, dir);
+            return true;
+        }
+        if (screenChooserOpen) {
+            var n = ScreenRec.monitors.length;
+            if (n === 0)
+                return false;
+            monitorFocus = Nav.edge(n, dir);
+            monList.positionViewAtIndex(monitorFocus, ListView.Contain);
+            return true;
+        }
+        var slots = faderSlots();
+        if (slots.length === 0)
+            return false;
+        faderFocus = dir < 0 ? slots[0] : slots[slots.length - 1];
+        return true;
+    }
+
+    function kbCycle(dir) { return cycleFader(dir); }
+    function kbActivate() {
+        if (screenChooserOpen) {
+            var mon = ScreenRec.monitors[monitorFocus];
+            if (mon) {
+                pickMonitor(mon.name);
+                return true;
+            }
+            return false;
+        }
+        if (chooserOpen) {
+            var src = sourceChoices[sourceFocus];
+            if (src) {
+                chooseSource(src.kind);
+                return true;
+            }
+            return false;
+        }
+        return press();
+    }
+    function kbBack() {
+        if (screenChooserOpen) {
+            screenChooserOpen = false;
+            chooserOpen = true;
+            return true;
+        }
+        if (chooserOpen) {
+            chooserOpen = false;
             return true;
         }
         return false;
@@ -812,20 +934,20 @@ PillSurface {
                     spacing: 6 * root.s
 
                     Repeater {
-                        model: [
-                            { kind: "screen", label: "Screen", glyph: "monitor" },
-                            { kind: "window", label: "Window / Region", glyph: "video" }
-                        ]
+                        model: root.sourceChoices
 
                         Rectangle {
                             id: srcTile
                             required property var modelData
+                            required property int index
+                            readonly property bool focused: root.sourceFocus === index
+                            readonly property bool lit: focused || srcArea.containsMouse
                             width: (chooser.width - 12 * root.s - 6 * root.s) / 2
                             height: parent.height
                             radius: 9 * root.s
-                            color: srcArea.containsMouse ? Qt.alpha(Theme.vermLit, 0.16) : Theme.tileBg
+                            color: lit ? Qt.alpha(Theme.vermLit, 0.16) : Theme.tileBg
                             border.width: 1
-                            border.color: srcArea.containsMouse ? Qt.alpha(Theme.vermLit, 0.5) : Theme.border
+                            border.color: lit ? Qt.alpha(Theme.vermLit, 0.5) : Theme.border
                             Behavior on color { ColorAnimation { duration: Motion.fast } }
 
                             Row {
@@ -836,14 +958,14 @@ PillSurface {
                                     width: 16 * root.s
                                     height: 16 * root.s
                                     name: srcTile.modelData.glyph
-                                    color: srcArea.containsMouse ? Theme.vermLit : Theme.iconDim
+                                    color: srcTile.lit ? Theme.vermLit : Theme.iconDim
                                     stroke: 1.7
                                 }
                                 Text {
                                     height: 16 * root.s
                                     verticalAlignment: Text.AlignVCenter
                                     text: srcTile.modelData.label
-                                    color: srcArea.containsMouse ? Theme.cream : Theme.subtle
+                                    color: srcTile.lit ? Theme.cream : Theme.subtle
                                     font.family: Theme.font
                                     font.pixelSize: 11 * root.s
                                     font.weight: Font.Bold
@@ -855,6 +977,7 @@ PillSurface {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
+                                onPositionChanged: root.sourceFocus = srcTile.index
                                 onClicked: root.chooseSource(srcTile.modelData.kind)
                             }
                         }
@@ -890,12 +1013,15 @@ PillSurface {
                     delegate: Rectangle {
                         id: monTile
                         required property var modelData
+                        required property int index
+                        readonly property bool focused: root.monitorFocus === index
+                        readonly property bool lit: focused || monArea.containsMouse
                         width: 152 * root.s
                         height: monList.height
                         radius: 9 * root.s
-                        color: monArea.containsMouse ? Qt.alpha(Theme.vermLit, 0.16) : Theme.tileBg
+                        color: lit ? Qt.alpha(Theme.vermLit, 0.16) : Theme.tileBg
                         border.width: 1
-                        border.color: monArea.containsMouse ? Qt.alpha(Theme.vermLit, 0.5) : Theme.border
+                        border.color: lit ? Qt.alpha(Theme.vermLit, 0.5) : Theme.border
                         Behavior on color { ColorAnimation { duration: Motion.fast } }
 
                         Column {
@@ -925,6 +1051,7 @@ PillSurface {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
+                            onPositionChanged: root.monitorFocus = monTile.index
                             onClicked: root.pickMonitor(monTile.modelData.name)
                         }
                     }

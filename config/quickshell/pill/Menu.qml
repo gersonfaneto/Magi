@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "Singletons"
+import "lib/nav.js" as Nav
 
 /**
  * 品 MENU surface: the pill's generic, caller-driven list picker. It owns no
@@ -87,10 +88,48 @@ PillSurface {
 
     function move(delta) {
         if (results.length === 0)
-            return;
-        selectedIndex = Math.max(0, Math.min(results.length - 1, selectedIndex + delta));
+            return false;
+        selectedIndex = Nav.step(selectedIndex, results.length, delta, true);
         list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
     }
+
+    readonly property int pageRows: Math.max(1, Math.floor(list.height / ((root.rowH + 2 * s))))
+
+    function page(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.page(selectedIndex, results.length, dir, pageRows, true);
+        list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    function edge(dir) {
+        if (results.length === 0)
+            return false;
+        selectedIndex = Nav.edge(results.length, dir);
+        list.positionViewAtIndex(selectedIndex, ListView.Contain);
+        return true;
+    }
+
+    /** Escape clears the filter, then cancels through the caller's hook. */
+    function back() {
+        if (!root.inputMode && (query.length > 0 || search.text.length > 0)) {
+            search.text = "";
+            query = "";
+            selectedIndex = 0;
+            return true;
+        }
+        cancel();
+        return true;
+    }
+
+    function kbStep(dir) { return move(dir); }
+    function kbPage(dir) { return page(dir); }
+    function kbEdge(dir) { return edge(dir); }
+    function kbCycle(dir) { return move(dir); }
+    function kbActivate() { activate(); return true; }
+    function kbBack() { return back(); }
 
     /** Commit the focused row (or the typed text) and close. */
     function activate() {
@@ -220,8 +259,11 @@ PillSurface {
             root.selectedIndex = 0;
         }
         onMoved: (d) => root.move(d)
+        onPaged: (d) => root.page(d)
+        onJumped: (d) => root.edge(d)
+        onCycled: (d) => root.move(d)
         onAccepted: root.activate()
-        onDismissed: root.cancel()
+        onDismissed: root.back()
     }
 
     Text {

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "lib/nav.js" as Nav
 
 /**
  * Shared base for the morphing settings surfaces: the category index and each
@@ -57,14 +58,36 @@ PillSurface {
 
     function kbMove(dir) {
         if (!rows.length)
-            return;
-        kbIndex = Math.max(0, Math.min(rows.length - 1, (kbIndex < 0 ? 0 : kbIndex + dir)));
+            return false;
+        kbIndex = Nav.step(kbIndex, rows.length, dir, false);
         focusRowItem = rows[kbIndex].item;
+        return true;
+    }
+
+    /** One viewport (five rows) without wrapping; settings rows clamp. */
+    function kbPage(dir) {
+        if (!rows.length)
+            return false;
+        kbIndex = Nav.page(kbIndex, rows.length, dir, 5, false);
+        focusRowItem = rows[kbIndex].item;
+        return true;
+    }
+
+    function kbEdge(dir) {
+        if (!rows.length)
+            return false;
+        kbIndex = Nav.edge(rows.length, dir);
+        focusRowItem = rows[kbIndex].item;
+        return true;
+    }
+
+    function kbCycle(dir) {
+        return kbMove(dir);
     }
 
     function kbAdjust(dir) {
         if (!rows.length)
-            return;
+            return false;
         if (kbIndex < 0) {
             kbIndex = 0;
             focusRowItem = rows[0].item;
@@ -76,11 +99,12 @@ PillSurface {
             r.set(dir > 0);
         else if (r.kind === "scrub")
             r.bump(dir);
+        return true;
     }
 
     function kbActivate() {
         if (kbIndex < 0)
-            return;
+            return false;
         var r = rows[kbIndex];
         if (r.kind === "toggle")
             r.set(!r.get());
@@ -88,6 +112,9 @@ PillSurface {
             root.requestSurface(r.surface);
         else if (r.kind === "seg")
             segCycle(r, 1);
+        else if (r.kind === "scrub")
+            return false;
+        return true;
     }
 
     /**

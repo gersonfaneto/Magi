@@ -34,6 +34,10 @@ Item {
     default property alias rightContent: rightSlot.data
 
     signal moved(int delta)
+    signal paged(int delta)
+    signal jumped(int edge)
+    signal cycled(int delta)
+    signal numbered(int n)
     signal accepted()
     signal dismissed()
     signal keyPressed(var event)
@@ -77,22 +81,43 @@ Item {
         selectByMouse: true
         selectionColor: Theme.verm
         cursorDelegate: root.showCursor ? null : noCursor
-        Keys.onUpPressed: root.moved(-1)
-        Keys.onDownPressed: root.moved(1)
         Keys.onPressed: (e) => {
             root.keyPressed(e);
             if (e.accepted)
                 return;
-            if (root.horizontalNav && (e.key === Qt.Key_Left || e.key === Qt.Key_Right)) {
+            var ctrl = (e.modifiers & Qt.ControlModifier) !== 0;
+            var alt = (e.modifiers & Qt.AltModifier) !== 0;
+            var shift = (e.modifiers & Qt.ShiftModifier) !== 0;
+            if (e.key === Qt.Key_Up) {
+                root.moved(-1);
+            } else if (e.key === Qt.Key_Down) {
+                root.moved(1);
+            } else if (ctrl && e.key === Qt.Key_P) {
+                root.moved(-1);
+            } else if (ctrl && e.key === Qt.Key_N) {
+                root.moved(1);
+            } else if (e.key === Qt.Key_PageUp) {
+                root.paged(-1);
+            } else if (e.key === Qt.Key_PageDown) {
+                root.paged(1);
+            } else if (ctrl && e.key === Qt.Key_Home) {
+                root.jumped(-1);
+            } else if (ctrl && e.key === Qt.Key_End) {
+                root.jumped(1);
+            } else if (e.key === Qt.Key_Tab || e.key === Qt.Key_Backtab) {
+                root.cycled((e.key === Qt.Key_Backtab || shift) ? -1 : 1);
+            } else if (alt && e.key >= Qt.Key_1 && e.key <= Qt.Key_9) {
+                root.numbered(e.key - Qt.Key_0);
+            } else if (root.horizontalNav && (e.key === Qt.Key_Left || e.key === Qt.Key_Right)) {
                 root.moved(e.key === Qt.Key_Right ? 1 : -1);
-                e.accepted = true;
             } else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
                 root.accepted();
-                e.accepted = true;
             } else if (root.catchEscape && e.key === Qt.Key_Escape) {
                 root.dismissed();
-                e.accepted = true;
+            } else {
+                return;
             }
+            e.accepted = true;
         }
     }
 
