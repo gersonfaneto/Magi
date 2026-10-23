@@ -5,7 +5,8 @@
   ...
 }:
 with lib;
-with builtins; {
+with builtins;
+{
   system = "x86_64-linux";
 
   imports = [
@@ -21,7 +22,7 @@ with builtins; {
     profiles = {
       role = "workstation";
       user = "gerson";
-      networks = ["br"];
+      networks = [ "br" ];
       hardware = [
         "cpu/amd"
         "gpu/amd"
@@ -84,10 +85,9 @@ with builtins; {
     };
     editors = {
       default = "nvim";
-      vim = {
-        enable = true;
-        nerdFonts = true;
-      };
+      vim.enable = true;
+      vim.nerdFonts = true;
+      emacs.enable = true;
     };
     shell = {
       direnv.enable = true;
@@ -109,7 +109,7 @@ with builtins; {
   };
 
   ## Local config
-  config = {pkgs, ...}: {
+  config = { pkgs, ... }: {
     modules.wm.theme.fonts.extraPackages = with pkgs; [
       fantasque-sans-mono
       nerd-fonts.fantasque-sans-mono
@@ -130,13 +130,13 @@ with builtins; {
   };
 
   ## Hardware config
-  hardware = {...}: {
+  hardware = { ... }: {
     boot.initrd.availableKernelModules = [
       "nvme"
       "ehci_pci"
       "rtsx_pci_sdmmc"
     ];
-    boot.kernelModules = ["kvm-amd"];
+    boot.kernelModules = [ "kvm-amd" ];
 
     # Hibernation writes the session image to the swap partition. Without this
     # the kernel has no resume device to read it back from.
