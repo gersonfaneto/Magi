@@ -1,0 +1,40 @@
+{
+  "default": {
+    "scheme": "nano",
+    "bg": "dark"
+  },
+  "schemes": {
+    "washi": {
+      "identity": true,
+      "editor": "generated"
+    },
+    "cockatoo": {
+      "accent": 4,
+      "editor": "cockatoo"
+    },
+    "everforest": {
+      "accent": 2,
+      "editor": "everforest"
+    },
+    "gruvbox-material": {
+      "accent": 3,
+      "editor": "gruvbox-material"
+    },
+    "macro": {
+      "accent": 3,
+      "editor": "macro"
+    },
+    "nano": {
+      "accent": 6,
+      "editor": "nano"
+    },
+    "sonokai": {
+      "accent": 1,
+      "editor": "sonokai"
+    },
+    "stata": {
+      "accent": 4,
+      "editor": "stata"
+    }
+  }
+}

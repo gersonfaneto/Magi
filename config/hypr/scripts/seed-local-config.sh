@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Seed ~/.config/hypr/local/modules from the checkout defaults.
 #
-# The local Hyprland tree is written by hand, so this runs on
+# The Quickshell Settings surfaces write only the local tree, so this runs on
 # login to make sure every file they expect exists. Existing files are left
 # alone: the local tree is the user's, the checkout is only the template.
 

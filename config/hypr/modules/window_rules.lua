@@ -158,22 +158,12 @@ if ok and type(stashApps) == "table" then
   end
 end
 
--- * Menus
+-- * Layers
 
--- fsel runs in a floating foot window; the launcher is a smaller box than the
--- generic menu and clipboard list.
-hl.window_rule({
-  name = "magi-menu",
-  match = { class = "magi-menu" },
-  float = true,
-  center = true,
-  size = { "monitor_w*0.6", "monitor_h*0.6" },
-})
-
-hl.window_rule({
-  name = "magi-launcher",
-  match = { class = "magi-launcher" },
-  float = true,
-  center = true,
-  size = { "monitor_w*0.45", "monitor_h*0.5" },
+-- Keep the pill from fading when the session lock hides and restores its
+-- layer, so it never pops back in out of sync with the lock morph.
+hl.layer_rule({
+  name = "pill-no-fade",
+  match = { namespace = "pill" },
+  no_anim = true,
 })

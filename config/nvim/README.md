@@ -75,6 +75,7 @@ Currently only tested on Linux (X11/Wayland/TTY) and Android (Termux).
   - [winbar](lua/minimal/plugin/winbar)
   - [statusline](lua/minimal/plugin/statusline.lua)
   - [statuscolumn](lua/minimal/plugin/statuscolumn.lua)
+  - [colorschemes](colors)
   - [intro message](lua/minimal/plugin/intro.lua)
 - [VSCode-Neovim](https://github.com/vscode-neovim/vscode-neovim) integration, makes you feel at home in VSCode when you
   occasionally need it
@@ -403,6 +404,7 @@ paths:
 
 ```
 .
+├── colors                      # colorschemes
 ├── plugin                      # custom plugins
 ├── ftplugin                    # custom filetype plugins
 ├── init.lua                    # entry of config
@@ -475,15 +477,17 @@ corresponding plugin keymaps.
 
 ### Colorschemes
 
-There is one colorscheme, `generated`, rendered by the dotfiles theme pipeline
-from the active mono palette into `$XDG_DATA_HOME/nvim/site/colors/`. It has a
-dark and a light variant, and follows the same tone as Hyprland and the shell.
+`cockatoo`, `nano`, `macro`, and `sonokai` are three builtin custom
+colorschemes, with separate palettes for dark and light background.
 
-Neovim restores the previous background on startup, so there is no need to set
-it in the config explicitly.
+Neovim is configured to restore the previous background and colorscheme
+settings on startup, so there is no need to set them up in the config file
+explicitly.
 
 To disable the auto-restore feature, remove the `minimal.colorscheme_restore` augroup
 in [lua/minimal/core/autocmds.lua](lua/minimal/core/autocmds.lua).
+
+To tweak a colorscheme, edit corresponding colorscheme files under [colors](colors).
 
 ### Auto Commands
 
@@ -762,7 +766,7 @@ Like many vim builtin plugins, these plugins can be disabled by setting the
   006.277  000.024  000.024: require('utils')
   006.278  000.071  000.047: require('utils.json')
   006.311  000.027  000.027: require('utils.fs')
-  008.283  000.898  000.898: sourcing /home/zeng/.local/share/nvim/site/colors/generated.lua
+  008.283  000.898  000.898: sourcing /home/zeng/.config/nvim/colors/sonokai.lua
   008.389  000.085  000.085: require('utils.hl')
   008.439  001.169: VimEnter autocommands
   008.853  000.017  000.017: require('ffi')

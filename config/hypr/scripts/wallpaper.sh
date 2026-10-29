@@ -1,75 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-flags_file="${XDG_STATE_HOME:-$HOME/.local/state}/magi/theme/flags.json"
-BUILTIN="${XDG_DATA_HOME:-$HOME/.local/share}/magi/wallpapers"
+flags_file="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/flags.json"
 WPDIR=$(jq -r '.wallpaperDir // ""' "$flags_file" 2>/dev/null || echo "")
 FIT=$(jq -r '.wallpaperFit // "crop"' "$flags_file" 2>/dev/null || echo "crop")
 case "$FIT" in crop|fit|stretch) ;; *) FIT=crop ;; esac
 if [ -z "$WPDIR" ]; then
-    # The generated mono wallpapers are the default. If they are missing (an
-    # old checkout), adopt an existing collection in the usual spots; two or
-    # more images counts as a collection, a single stray file does not, so an
-    # incidental picture never hijacks the default.
-    if [ -d "$BUILTIN" ] && [ -n "$(find -H "$BUILTIN" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) | head -1)" ]; then
-        WPDIR="$BUILTIN"
-    else
-        for cand in "$HOME/Pictures/Wallpapers" "$HOME/Pictures/wallpapers" "$HOME/Wallpapers" "$HOME/wallpapers"; do
-            [ -d "$cand" ] || continue
-            n=$(find -H "$cand" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) | head -2 | wc -l)
-            if [ "$n" -ge 2 ]; then WPDIR="$cand"; break; fi
-        done
-    fi
+    # No explicit folder set: adopt an existing collection in the usual spots.
+    # Two or more images counts as a collection, a single stray file does not,
+    # so an incidental picture never hijacks the default.
+    for cand in "$HOME/Pictures/Wallpapers" "$HOME/Pictures/wallpapers" "$HOME/Wallpapers" "$HOME/wallpapers"; do
+        [ -d "$cand" ] || continue
+        n=$(find "$cand" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) | head -2 | wc -l)
+        if [ "$n" -ge 2 ]; then WPDIR="$cand"; break; fi
+    done
     [ -n "$WPDIR" ] || WPDIR="$HOME/Pictures/Wallpapers"
 fi
-RESOLVED="${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-dir"
-mkdir -p "$(dirname "$RESOLVED")"
+RESOLVED="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-dir"
 printf '%s\n' "$WPDIR" > "$RESOLVED"
-# No-op mode for callers that only want the folder re-resolved.
+# No-op mode for the QML side: re-resolve the folder and exit before touching any daemon state.
 [ "${1:-}" = "resolve" ] && exit 0
-STATE="${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper"
-MAP="${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-map"
-BAG="${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-bag"
-STILL="${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-still.png"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper"
+MAP="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-map"
+BAG="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-bag"
+STILL="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-still.png"
+WLOG="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/wallcolors.log"
 
 is_video() {
     case "${1##*.}" in
         [Mm][Pp]4|[Ww][Ee][Bb][Mm]|[Mm][Kk][Vv]|[Mm][Oo][Vv]) return 0 ;;
         *) return 1 ;;
     esac
-}
-
-active_tone() {
-    jq -r '.bg // "dark"' "$flags_file" 2>/dev/null || echo dark
-}
-
-all_pics() {
-    # -H follows the shipped collection symlink into the checkout.
-    find -H "$WPDIR" -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \)
-}
-
-list_pics() {
-    if [ "$WPDIR" = "$BUILTIN" ]; then
-        # The generated collection is split by tone; a random walk under the
-        # dark bundle must never surface a white wallpaper.
-        local tone
-        tone=$(active_tone)
-        all_pics | grep -E "(^|/)[^/]*[-_]${tone}[-_]" || true
-    else
-        all_pics
-    fi
-}
-
-matches_tone() {
-    [ "$WPDIR" != "$BUILTIN" ] && return 0
-    printf '%s\n' "$1" | grep -Eq "(^|/)[^/]*[-_]$(active_tone)[-_]"
-}
-
-tone_pics() {
-    local tone="$1"
-    if [ -d "$BUILTIN" ]; then
-        find -H "$BUILTIN" -maxdepth 1 -type f -iname "*-${tone}-*" \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \)
-    fi
 }
 
 ensure_daemon() {
@@ -83,6 +44,10 @@ ensure_daemon() {
         done
     done
     return 1
+}
+
+list_pics() {
+    find "$WPDIR" -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \)
 }
 
 refill_bag() {
@@ -111,7 +76,7 @@ pop_bag() {
             fi
             line=$(head -n1 "$BAG")
             tail -n +2 "$BAG" > "$BAG.tmp" && mv "$BAG.tmp" "$BAG"
-            if [ -f "$line" ] && matches_tone "$line"; then
+            if [ -f "$line" ]; then
                 printf '%s\n' "$line"
                 exit 0
             fi
@@ -228,17 +193,28 @@ sync_videos() {
     done <<< "$desired"
 }
 
-# The wallpaper only records what is showing now. The palette is independent of
-# it: the tone comes from `magi theme bg`, and GTK apps follow the same bundle.
-record_wallpaper() {
-    local focused pic
+# The palette follows the focused monitor: whatever hangs there drives matugen,
+# the global state file and the global still, so the Settings dynamic re-run
+# and the strip's current marker stay coherent with what the user looks at.
+palette_update() {
+    local pmode focused pic show
     focused=$(focused_output)
     pic=""
     [ -n "$focused" ] && pic=$(map_get "$focused")
     [ -n "$pic" ] || pic=$(cat "$STATE" 2>/dev/null || true)
     [ -n "$pic" ] && [ -f "$pic" ] || return 0
+    show="$pic"
+    if is_video "$pic"; then
+        make_still "$pic" "$STILL" && show="$STILL" || return 0
+    fi
     mkdir -p "$(dirname "$STATE")"
     printf '%s\n' "$pic" > "$STATE"
+    pmode=$(jq -r '.paletteMode // "scheme"' "$flags_file" 2>/dev/null || echo scheme)
+    mkdir -p "$(dirname "$WLOG")"
+    python3 "$(dirname "$0")/wallcolors.py" "$show" >>"$WLOG" 2>&1 || true
+    case "$pmode" in
+        dynamic) python3 "$(dirname "$0")/theme.py" apply >>"$WLOG" 2>&1 || true ;;
+    esac
 }
 
 map_has_video() {
@@ -256,19 +232,15 @@ restore_all() {
     local o pic any=false
     for o in $(outputs); do
         pic=$(map_get "$o")
-        if [ -z "$pic" ] || [ ! -f "$pic" ] || ! matches_tone "$pic"; then
-            pic=$(cat "$STATE" 2>/dev/null || true)
-        fi
-        if [ -z "$pic" ] || [ ! -f "$pic" ] || ! matches_tone "$pic"; then
-            pic=$(pop_bag) || continue
-        fi
+        [ -n "$pic" ] && [ -f "$pic" ] || pic=$(cat "$STATE" 2>/dev/null || true)
+        [ -n "$pic" ] && [ -f "$pic" ] || pic=$(pop_bag) || continue
         map_put "$o" "$pic"
         apply_visual "$pic" "$o"
         any=true
     done
     [ "$any" = true ] || exit 0
     sync_videos
-    record_wallpaper
+    palette_update
     exit 0
 }
 
@@ -282,7 +254,7 @@ target=""
 if [ "$cmd" = "init" ]; then
     if [ ! -s "$MAP" ] && [ -s "$STATE" ]; then
         pic=$(cat "$STATE")
-        if [ -f "$pic" ] && matches_tone "$pic"; then map_put_all "$pic"; fi
+        [ -f "$pic" ] && map_put_all "$pic"
     fi
     if [ "$daemon_was_running" = true ]; then
         if map_has_video && ! pgrep -x mpvpaper >/dev/null 2>&1; then
@@ -291,15 +263,6 @@ if [ "$cmd" = "init" ]; then
         exit 0
     fi
     restore_all
-elif [ "$cmd" = "tone" ]; then
-    # theme.py calls this after writing the new bg to flags.json. Pick from the
-    # generated collection for that tone; a custom wallpaperDir is left alone.
-    [ "$WPDIR" = "$BUILTIN" ] || exit 0
-    tone="${2:-$(active_tone)}"
-    mapfile -t picks < <(tone_pics "$tone")
-    [ "${#picks[@]}" -gt 0 ] || exit 0
-    pic=$(printf '%s\n' "${picks[@]}" | shuf -n1)
-    target=""
 elif [ "$cmd" = "set" ]; then
     pic="${2:-}"
     [ -f "$pic" ] || exit 1
@@ -323,4 +286,4 @@ fi
 
 apply_visual "$pic" "$target"
 sync_videos
-record_wallpaper
+palette_update

@@ -5,11 +5,15 @@
 #   magi hook on-started
 #
 # DESCRIPTION:
-#   Run at session start (config/hypr/modules/autostart.lua). The theme unit
-#   may have started before Hyprland was listening, so re-apply here: this is
-#   what pushes the tone-correct cursor and icon themes through gsettings and
-#   hyprctl, and refreshes the generated foot palette.
+#   Run at session start (modules/wm/hyprland modules/autostart.lua). Also seeds
+#   the mutable foot theme symlinks foot.ini includes, so a fresh install gets
+#   the setcolor/setbg palette (and no missing-include error) from the first
+#   window -- setcolor makes themes/{dark,light}.ini, setbg makes theme.ini on
+#   top.
 
-if command -v magi >/dev/null 2>&1; then
-  magi theme apply >/dev/null 2>&1 || true
+if command -v setcolor >/dev/null 2>&1; then
+  config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+  # Only when missing, so a login never resets the picked scheme or the mode.
+  [[ -e $config_home/foot/themes/dark.ini ]] || setcolor
+  [[ -e $config_home/foot/theme.ini ]] || setbg "$(getbg)"
 fi

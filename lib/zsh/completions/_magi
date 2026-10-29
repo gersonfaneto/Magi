@@ -171,14 +171,30 @@ __magi_test_suites() {
   (( $#suites )) && _wanted suites expl 'nixos suite' compadd -a suites
 }
 
-# magi theme's first word is the subcommand; only bg and apps take a value,
+# Schemes come from the same registry theme.py reads, so a scheme added there
+# shows up on the next TAB without touching this file. The foot themes are only
+# a fallback for a checkout without jq.
+__magi_theme_schemes() {
+  local expl
+  local -a schemes
+  if (( $+commands[jq] )) && [[ -r $_magi_root/config/theme/schemes.json ]]; then
+    schemes=( ${(f)"$(jq -r '.schemes | keys[]' -- $_magi_root/config/theme/schemes.json 2>/dev/null)"} )
+  fi
+  (( $#schemes )) || schemes=( $_magi_root/config/foot/themes/*-dark.ini(N.:t:r) )
+  schemes=( ${schemes%-dark} )
+  (( $#schemes )) && _wanted schemes expl 'scheme' compadd -a schemes
+}
+
+# magi theme's first word is the subcommand; only three of them take a value,
 # and each has its own set. The rest have nothing to say.
 __magi_theme_arg() {
   case $line[1] in
+    (set) (( $#line > 2 )) || __magi_theme_schemes ;;
     (bg) (( $#line > 2 )) || _wanted backgrounds expl 'background' compadd light dark ;;
+    (source) (( $#line > 2 )) || _wanted modes expl 'palette mode' compadd scheme dynamic ;;
     (apps) (( $#line > 2 )) || _wanted app-themes expl 'app theme' compadd on off ;;
-    (status|apply|render|check) return 1 ;;
-    (*) _wanted theme-commands expl 'theme command' compadd status bg apply render check apps ;;
+    (list|status|apply|render|check) return 1 ;;
+    (*) _wanted theme-commands expl 'theme command' compadd list status set bg source apply render check apps ;;
   esac
 }
 

@@ -1,37 +1,33 @@
 #!/usr/bin/env zsh
 # vim:ft=zsh:et:ts=2:sw=2:sts=2:
 #
-# Switch the whole session between the light and dark mono themes.
+# Set the light or dark background for the whole desktop.
 #
 # SYNOPSIS:
-#   setbg [light|dark] [--next]
+#   setbg [light|dark]
 #
 # DESCRIPTION:
-#   Picks the light or dark variant of the single mono palette and re-renders
-#   every consumer through theme.py: Hyprland, Qt, GTK, fsel, qutebrowser,
-#   foot, highlight, nvim, tmux, fzf and the zsh shell. It also switches to a
-#   wallpaper from the matching built-in pair. With no argument, prints the
-#   active variant; --next flips it.
+#   Picks the light or dark variant of the active scheme and re-renders every
+#   consumer through theme.py. With no argument, the registry's default tone is
+#   used. This switches the palette source to "scheme", the only source with a
+#   light/dark pair.
 #
 # ARGUMENTS:
 #   * BG @arg-bg  'light' or 'dark'.
 
 main() {
-  local bg='' next=false arg
+  local bg='' arg
   for arg in "$@"; do
     case "$arg" in
       -h | --help)
-        print "Usage: ${0:t} [light|dark|--next]"
+        print "Usage: ${0:t} [light|dark]"
         exit
-        ;;
-      --next)
-        next=true
         ;;
       light | dark)
         bg="$arg"
         ;;
       *)
-        print -u2 "Usage: ${0:t} [light|dark|--next]"
+        print -u2 "Usage: ${0:t} [light|dark]"
         return 1
         ;;
     esac
@@ -42,11 +38,11 @@ main() {
     return 1
   fi
 
-  if $next; then
-    [[ $(magi theme status | awk '/^bg:/ { print $2 }') == light ]] && bg=dark || bg=light
+  if [[ -n $bg ]]; then
+    magi theme bg "$bg"
+  else
+    magi theme bg
   fi
-
-  magi theme bg ${bg:+"$bg"}
 }
 
 main "$@"

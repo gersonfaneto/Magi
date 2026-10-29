@@ -161,7 +161,7 @@ extract_install() {
 	local icon_path="$icon_dir/$slug.png"
 	[ -f "$icon_path" ] || { icon_path="$icon_dir/$slug.svg"; [ -f "$icon_path" ] || icon_path=""; }
 
-	local df_out="$desktop_dir/magi-$slug.desktop"
+	local df_out="$desktop_dir/quickshell-$slug.desktop"
 	{
 		echo "[Desktop Entry]"
 		echo "Type=Application"
@@ -175,7 +175,7 @@ extract_install() {
 		[ -n "$categories" ] && echo "Categories=$categories"
 		[ -n "$wmclass" ] && echo "StartupWMClass=$wmclass"
 		echo "Terminal=false"
-		echo "X-Magi-AppImage=true"
+		echo "X-Quickshell-AppImage=true"
 	} >"$df_out"
 
 	reg_set "$slug" "$name" "$dest" "$icon_path" "$df_out" "$appid"
@@ -199,11 +199,9 @@ install_font() {
 install_wallpaper() {
 	local src="$1" base="$2" name wpdir dest
 	name="${base%.*}"
-	wpdir="$(jq -r '.wallpaperDir // ""' "${XDG_STATE_HOME:-$HOME/.local/state}/magi/theme/flags.json" 2>/dev/null || echo "")"
-	[ -n "$wpdir" ] || wpdir="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-dir" 2>/dev/null || true)"
-	[ -n "$wpdir" ] || wpdir="${XDG_DATA_HOME:-$HOME/.local/share}/magi/wallpapers"
-	# The generated collection lives in the checkout; install beside the user.
-	[ "$wpdir" = "${XDG_DATA_HOME:-$HOME/.local/share}/magi/wallpapers" ] && wpdir="$HOME/Pictures/Wallpapers"
+	wpdir="$(jq -r '.wallpaperDir // ""' "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/flags.json" 2>/dev/null || echo "")"
+	[ -n "$wpdir" ] || wpdir="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-dir" 2>/dev/null || true)"
+	[ -n "$wpdir" ] || wpdir="$HOME/Pictures/Wallpapers"
 	mkdir -p "$wpdir"
 	case "$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')" in
 		*.webp) dest="$wpdir/$name.png"; magick "$src" "$dest" ;;

@@ -1,15 +1,16 @@
 #!/usr/bin/env zsh
 # vim:ft=zsh:et:ts=2:sw=2:sts=2:
-# Print the session background mode for this Hyprland + magi desktop.
+# Print the system background mode for this Hyprland + Quickshell desktop.
 #
-# flags.json is the source of truth for the whole mono session: desktop,
-# terminal, editor and shell all wear its tone. Fall back to the applied palette
-# (current.json), then gsettings (GTK apps), then the time of day (suggestbg).
+# The applied palette bundle is the source of truth: theme.py resolves washi,
+# scheme and dynamic into current.json, whose tone is what every surface is
+# actually wearing. Fall back to the flags file, then gsettings
+# (GTK apps), then the time of day (suggestbg).
 
 STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
 
 bundle_bg() {
-  local palette=$STATE_HOME/magi/theme/palettes/current.json
+  local palette=$STATE_HOME/quickshell/palettes/current.json
   [[ -r $palette ]] || return 1
   command -v jq >/dev/null 2>&1 || return 1
 
@@ -22,7 +23,7 @@ bundle_bg() {
 }
 
 flags_bg() {
-  local flags=$STATE_HOME/magi/theme/flags.json
+  local flags=$STATE_HOME/quickshell/flags.json
   [[ -r $flags ]] || return 1
   command -v jq >/dev/null 2>&1 || return 1
 
@@ -45,7 +46,7 @@ gsettings_bg() {
   fi
 }
 
-if ! flags_bg && ! bundle_bg && ! gsettings_bg; then
-  print -u2 "getbg: could not detect the session mode, falling back to the clock"
+if ! bundle_bg && ! flags_bg && ! gsettings_bg; then
+  print -u2 "getbg: could not detect the desktop mode, falling back to the clock"
   suggestbg
 fi

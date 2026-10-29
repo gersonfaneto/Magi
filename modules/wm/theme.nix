@@ -11,8 +11,8 @@ with self.lib; let
   cfg = config.modules.wm.theme;
 
   fontSize = 12;
-  # The renderer owns the palette and writes the Qt colour scheme.
-  qtScheme = "magi.conf";
+  # Quickshell's renderer owns the palette and writes the Qt colour scheme.
+  qtScheme = "quickshell.conf";
   # Just enough of a qt{5,6}ct config for the session palette to land. The
   # rest of the file is qtct's own defaults and I'd rather not pin those.
   # QFont's string form grew nine fields between Qt5 and Qt6, so `tail` --
@@ -63,21 +63,21 @@ in {
     };
 
     cursor = {
-      name = mkOpt' str "phinger-cursors-dark" "Cursor theme for the dark variant";
-      lightName = mkOpt' str "phinger-cursors-light" "Cursor theme for the light variant";
+      name = mkOpt' str "catppuccin-mocha-dark-cursors" "Cursor theme, by name";
       package =
-        mkOpt' package pkgs.phinger-cursors
-        "The package shipping both cursor themes. The greeter installs this itself.";
+        mkOpt' package pkgs.catppuccin-cursors.mochaDark
+        "The package shipping `name`. The greeter installs this itself.";
       size = mkOpt' int 32 "Cursor size, in pixels";
     };
 
     icons = {
-      name = mkOpt' str "Mono-Dark" "Icon theme for the dark variant";
-      lightName = mkOpt' str "Mono" "Icon theme for the light variant";
+      name = mkOpt' str "Dracula" "Icon theme, by name";
       packages =
         mkOpt' (listOf package)
-        [self.packages.mono-icons]
-        "Packages searched for `name` and `lightName`";
+        (with pkgs; [
+          tela-circle-icon-theme
+          dracula-icon-theme
+        ]) "Packages searched for `name`";
     };
 
     files =
@@ -86,9 +86,6 @@ in {
         options = {
           input_path = mkOpt' str "" "The template to render";
           output_path = mkOpt' str "" "Where to write the rendered template";
-          scope =
-            mkOpt' (enum ["desktop" "terminal"]) "desktop"
-            "Which palette bundle renders this file";
           pre_hook = mkOpt' lines "" "Shell run before the template is written";
           post_hook = mkOpt' lines "" "Shell run after the template is written";
         };
@@ -109,8 +106,7 @@ in {
             size = cfg.fonts.terminal.size;
           };
         };
-        cursor = {inherit (cfg.cursor) name lightName size;};
-        icons = {inherit (cfg.icons) name lightName;};
+        cursor = {inherit (cfg.cursor) name size;};
       };
 
       fonts = {
@@ -165,38 +161,35 @@ in {
       # Picking the scheme in qt6ct used to be a once-per-machine chore, and
       # the machine I did it on is still wearing the palette its predecessor
       # rendered. Nix owns both configs now, so the chore is gone -- at the
-      # price of qtct's GUI no longer being able to save over them.
-      home.configFile = {
+      # price of qtct's GUI no longer being able to save over them. The scheme
+      # itself is rendered by Quickshell, so only install these when it is on.
+      home.configFile = mkIf config.modules.wm.quickshell.enable {
         "qt5ct/qt5ct.conf".text = mkQtCt "qt5ct" "50,0,0,0,0,0";
         "qt6ct/qt6ct.conf".text = mkQtCt "qt6ct" "400,0,0,0,0,0,0,0,0,0,0,1,,0,0";
       };
     }
 
-    ## The Qt colour scheme is one of the renderer's desktop outputs, so it
-    ## follows the same palette as Hyprland, fsel and qutebrowser.
-    {
+    ## The Qt colour scheme is one of the renderer's outputs, so it follows the
+    ## same palette as the shell, Hyprland, foot and nvim.
+    (mkIf config.modules.wm.quickshell.enable {
       modules.wm.theme.files = {
         qt5ct = {
           input_path = "${config.magi.configDir}/theme/qtct.template.conf";
-          output_path = "${config.home.configDir}/qt5ct/colors/magi.conf";
+          output_path = "${config.home.configDir}/qt5ct/colors/quickshell.conf";
         };
         qt6ct = {
           input_path = "${config.magi.configDir}/theme/qtct.template.conf";
-          output_path = "${config.home.configDir}/qt6ct/colors/magi.conf";
-        };
-        fsel = {
-          input_path = "${config.magi.configDir}/fsel/config.template.toml";
-          output_path = "${config.home.configDir}/fsel/config.toml";
+          output_path = "${config.home.configDir}/qt6ct/colors/quickshell.conf";
         };
       };
-    }
+    })
     ## The manifest theme.py reads. It is a state link so the renderer can
     ## watch for a rebuild without writing into the checkout.
     (mkIf (cfg.files != {}) {
-      home.stateLink."magi/theme/templates.json" = "${pkgs.writeText "magi-templates.json" (
+      home.stateLink."quickshell/templates.json" = "${pkgs.writeText "quickshell-templates.json" (
         builtins.toJSON (mapAttrsToList (name: f: {
             inherit name;
-            inherit (f) input_path output_path scope pre_hook post_hook;
+            inherit (f) input_path output_path pre_hook post_hook;
           })
           cfg.files)
       )}";

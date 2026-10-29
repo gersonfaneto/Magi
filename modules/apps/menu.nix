@@ -18,9 +18,9 @@ in {
 
   config = mkIf cfg.enable (mkMerge [
     {
-      # The menus are `magi @menu ...` scripts, rendered by fsel in a floating
-      # foot window. Only the tabler-icon SVGs need fetching; the name table and
-      # the emoji lists ride in the checkout.
+      # The menus are `magi @menu ...` scripts, which the Quickshell pill's
+      # generic surface renders. Only the tabler-icon SVGs need fetching; the
+      # name table and the emoji lists ride in the checkout.
       home.dataFile."magi/tabler-icons".source = let
         src = pkgs.fetchFromGitHub {
           owner = "tabler";
@@ -42,23 +42,23 @@ in {
         (mkLauncherEntry "Open Bookmark ->" {
           description = "In ${config.modules.apps.browsers.default}";
           icon = "bookmark-new-symbolic";
-          exec = "foot --app-id=magi-menu -e magi @menu bookmark";
+          exec = "magi @menu bookmark";
         })
         (mkLauncherEntry "Copy Icon ->" {
           icon = "icons";
-          exec = "foot --app-id=magi-menu -e magi @menu icon";
+          exec = "magi @menu icon";
         })
         (mkLauncherEntry "Open File ->" {
           icon = "folder";
-          exec = "foot --app-id=magi-menu -e magi @menu file";
+          exec = "magi @menu file";
         })
         (mkLauncherEntry "Open Directory in Terminal ->" {
           icon = "folder";
-          exec = "foot --app-id=magi-menu -e magi @menu file --dirs";
+          exec = "magi @menu file --dirs";
         })
         (mkLauncherEntry "Emoji Selector ->" {
           icon = "face-smile";
-          exec = "foot --app-id=magi-menu -e magi @menu emoji";
+          exec = "magi @menu emoji";
         })
       ];
     }
@@ -67,7 +67,7 @@ in {
       user.packages = [
         (mkLauncherEntry "Manage Bluetooth Devices ->" {
           icon = "bluetooth";
-          exec = "foot -e bluetoothctl";
+          exec = "qs -c pill ipc call pill page \"\" bt";
         })
       ];
     })
@@ -76,7 +76,7 @@ in {
       user.packages = [
         (mkLauncherEntry "Connect to WiFi ->" {
           icon = "network-wireless";
-          exec = "foot -e nmtui";
+          exec = "qs -c pill ipc call pill page \"\" wifi";
         })
       ];
     })
@@ -85,7 +85,7 @@ in {
       user.packages = [
         (mkLauncherEntry "Mount/unmount Devices ->" {
           icon = "drive-harddisk";
-          exec = "foot --app-id=magi-menu -e magi @menu mount";
+          exec = "magi @menu mount";
         })
       ];
     })

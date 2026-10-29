@@ -610,12 +610,9 @@ do
     local colors_config = vim.tbl_deep_extend(
       'keep',
       json.read(colors_config_file),
-      { bg = 'dark', colors_name = 'generated' }
+      { bg = 'dark', colors_name = 'nano' }
     )
 
-    -- The theme pipeline owns the only scheme now; a stale name from an old
-    -- checkout must not point at a file that no longer exists.
-    colors_config.colors_name = 'generated'
     vim.go.bg = colors_config.bg
 
     -- Colorschemes provided by plugins are not loaded before fully startup
@@ -650,7 +647,7 @@ do
     'Colorscheme',
     {
       nested = true,
-      desc = 'Spawn setbg on background change.',
+      desc = 'Spawn setbg/setcolors on colorscheme change.',
       callback = function()
         if vim.g.script_set_bg or vim.g.script_set_colors then
           return
@@ -664,6 +661,16 @@ do
             and colors_config.bg == vim.go.bg
           then
             return
+          end
+
+          if colors_config.colors_name ~= vim.g.colors_name then
+            colors_config.colors_name = vim.g.colors_name
+            if
+              vim.g.colors_name ~= 'generated'
+              and vim.fn.executable('setcolor') == 1
+            then
+              vim.system({ 'setcolor', vim.g.colors_name })
+            end
           end
 
           if colors_config.bg ~= vim.go.bg and vim.go.termguicolors then

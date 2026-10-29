@@ -36,15 +36,15 @@ rm -f "$fake/notify.args"
 grep -q 'Missing failed (exit 127)' "$fake/notify.args"
 
 rm -f "$fake/notify.args"
-mkdir -p "$fake/Applications" "$fake/share/applications" "$fake/share/magi"
+mkdir -p "$fake/Applications" "$fake/share/applications" "$fake/share/quickshell"
 printf '#!/bin/sh\ntouch "%s/ran"\n' "$fake" >"$fake/Applications/Foo-1.1-x86_64.AppImage"
 chmod +x "$fake/Applications/Foo-1.1-x86_64.AppImage"
-printf '[Desktop Entry]\nExec="%s/Applications/Foo-1.0-x86_64.AppImage" %%U\n' "$fake" >"$fake/share/applications/magi-foo.desktop"
-printf '{"foo":{"appimagePath":"%s/Applications/Foo-1.0-x86_64.AppImage","desktopPath":"%s/share/applications/magi-foo.desktop"}}' "$fake" "$fake" >"$fake/share/magi/appimages.json"
+printf '[Desktop Entry]\nExec="%s/Applications/Foo-1.0-x86_64.AppImage" %%U\n' "$fake" >"$fake/share/applications/quickshell-foo.desktop"
+printf '{"foo":{"appimagePath":"%s/Applications/Foo-1.0-x86_64.AppImage","desktopPath":"%s/share/applications/quickshell-foo.desktop"}}' "$fake" "$fake" >"$fake/share/quickshell/appimages.json"
 HOME="$fake" XDG_DATA_HOME="$fake/share" "$here/launch-guard.sh" Foo "" "" "$fake/Applications/Foo-1.0-x86_64.AppImage"
 [ -e "$fake/ran" ]
 [ ! -e "$fake/notify.args" ]
-grep -q "Foo-1.1-x86_64.AppImage" "$fake/share/applications/magi-foo.desktop"
-[ "$(jq -r .foo.appimagePath "$fake/share/magi/appimages.json")" = "$fake/Applications/Foo-1.1-x86_64.AppImage" ]
+grep -q "Foo-1.1-x86_64.AppImage" "$fake/share/applications/quickshell-foo.desktop"
+[ "$(jq -r .foo.appimagePath "$fake/share/quickshell/appimages.json")" = "$fake/Applications/Foo-1.1-x86_64.AppImage" ]
 
 echo ok

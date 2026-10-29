@@ -20,7 +20,6 @@
 (import magi/menu)
 (import magi/sys)
 (import magi/vars)
-(import spork/json :as json)
 (import spork/sh :as fs)
 
 # tabler.json ships in the checkout; the svgs are fetched by modules/apps/menu.nix.
@@ -95,19 +94,16 @@
         (:set *vars* key found)
         found)))
 
-(defn- palette-fg
-  ``The colour the desktop is drawing text in, read from the bundle theme.py
-  keeps current. It is the only live palette that exists as a hex librsvg can
-  take.``
+(def- *fg-peg* (peg! ~(some (+ (* "fg:" :s+ (<- (* "#" (some :h)))) 1))))
+
+(defn- pill-fg
+  ``The colour the shell is about to draw text in. The pill is the only place
+  the live palette exists as a hex I can hand to librsvg, so ask it.``
   []
-  (def file (path :state "theme" "palettes" "current.json"))
-  (def bundle
-    (when (path/file? file)
-      (ignore-errors (json/decode (slurp file) :keywords true))))
-  (when (dictionary? bundle)
-    (def hex (or (bundle :cream) (bundle :on_surface) (bundle :bright)))
-    (when (and (string? hex) (not (empty? hex)))
-      (if (string/has-prefix? "#" hex) hex (string "#" hex)))))
+  (or (when-let [out (ignore-errors ($<_ qs -c pill ipc call pill cream))
+                 text (string/trim out)]
+        (first (peg/match *fg-peg* (string "fg: " text))))
+      "#e6d6cb"))
 
 # Upstream draws every icon in `currentColor`, which librsvg (and rofi by
 # extension) renders to black, which is horrible on dark palettes. So copy and
@@ -147,7 +143,7 @@
   (def file (tabler-json))
   (if-not file
     {}
-    (let [svgs (when (path/directory? *tabler-dir*) (recoloured (or (palette-fg) "#f2f2f2")))
+    (let [svgs (when (path/directory? *tabler-dir*) (recoloured (pill-fg)))
           have (if svgs
                  (tabseq [f :in (os/dir svgs)] (path/no-ext f ".svg") true)
                  {})]

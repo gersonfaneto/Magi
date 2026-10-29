@@ -50,7 +50,7 @@ with self.lib;
 
       # NetworkManager owns association, DHCP, DNS and secrets for both wired
       # and wireless links. It replaced the old split stack (iwd for L2,
-      # systemd-networkd for L3) so the TUI pickers can drive the whole
+      # systemd-networkd for L3) so the Quickshell surfaces can drive the whole
       # thing through NetworkManager's D-Bus API instead of shelling out to
       # iwctl. The old IPv6 privacy behaviour is preserved in the connection
       # defaults; NM's built-in route metrics already prefer wired over wifi.
@@ -94,7 +94,7 @@ with self.lib;
       services.openssh.startWhenNeeded = true;
     })
 
-    # modules/wm/hyprland turns on power-profiles-daemon. This reverts to
+    # modules/wm/quickshell.nix turns on power-profiles-daemon. This reverts to
     # the balanced profile on each startup, in case a bar widget changed it.
     (mkIf config.services.power-profiles-daemon.enable {
       # `balanced` defers to amd-pstate's firmware (full boost under load, actual

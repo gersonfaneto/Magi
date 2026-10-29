@@ -1,7 +1,11 @@
 -- config/hypr/modules/input.lua
 --
--- Pointer, keyboard and tablet input. Edit this file directly; the
--- checkout's ~/.config/hypr/local/modules shadows it if present.
+-- Pointer, keyboard and tablet input. The Quickshell Input surface
+-- (config/quickshell/pill/Input.qml) rewrites this file through
+-- ~/.config/hypr/local/modules and reloads Hyprland.
+--
+-- Double-quoted strings on purpose: the surface's JS setters only strip double
+-- quotes, so single-quoted values would break its read back.
 
 hl.config({
   input = {

@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Apply and render the monochrome desktop theme.
+"""Apply and render the desktop theme.
 
-One palette family has two tones. Every consumer -- Hyprland, Qt, fsel,
-qutebrowser, GTK, foot, highlight, nvim, tmux, fzf and the zsh shell -- renders
-from the same mono-<tone> bundle.
+One palette bundle drives every consumer: the Quickshell pill and lock read
+current.json, and the manifest here renders Hyprland, Qt, foot, highlight, the
+generated nvim colorscheme, tmux, fzf and the zsh shell from that same file.
+The bundle comes from the Nix-built scheme set or from wallcolors.py for the
+dynamic mode.
 
-    theme.py apply
+    theme.py apply [--refresh]
+    theme.py source scheme|dynamic
+    theme.py set SCHEME
     theme.py bg light|dark
     theme.py render
     theme.py status
+    theme.py list
     theme.py check
     theme.py apps on|off
 """
@@ -21,30 +26,35 @@ import subprocess
 import sys
 from pathlib import Path
 
+from themelib import darken, is_light, lighten, load_registry, mix, on
+
 HOME = Path.home()
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or HOME / ".config")
 STATE = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local" / "state")
-DATA = Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local" / "share")
 SCRIPT_DIR = Path(__file__).resolve().parent
-CONFIG_ROOT = Path(os.environ.get("MAGI_CONFIG_DIR") or SCRIPT_DIR.parents[2])
+CONFIG_ROOT = Path(os.environ.get("MAGI_CONFIG_DIR") or SCRIPT_DIR.parents[1])
+REGISTRY = CONFIG_ROOT / "theme" / "schemes.json"
 
-PALETTES = STATE / "magi" / "theme" / "palettes"
+PALETTES = STATE / "quickshell" / "palettes"
 CURRENT = PALETTES / "current.json"
-FLAGS = PALETTES.parent / "flags.json"
-MANIFEST = PALETTES.parent / "templates.json"
-APPLIED = PALETTES.parent / "palette-applied"
-INFO = DATA / "magi" / "info.json"
+FLAGS = STATE / "quickshell" / "flags.json"
+MANIFEST = STATE / "quickshell" / "templates.json"
+APPLIED = STATE / "quickshell" / "palette-applied"
 
 WALLCOLORS = SCRIPT_DIR / "wallcolors.py"
-WALLPAPER = SCRIPT_DIR / "wallpaper.sh"
 FOOT_THEME = CONFIG / "foot" / "theme.ini"
 NVIM_STATE = STATE / "nvim" / "colors.json"
+WALLPAPER = STATE / "quickshell-wallpaper"
+WALLPAPER_STILL = STATE / "quickshell-wallpaper-still.png"
 
-TONES = ("dark", "light")
-REMOVED_FLAGS = ("paletteMode", "scheme", "manualHue", "manualDark", "manualSat")
+PALETTE_MODES = ("scheme", "dynamic")
+REMOVED_FLAGS = ("manualHue", "manualDark", "manualSat")
+
 DEFAULT_FLAGS = {
+    "paletteMode": "scheme",
+    "scheme": "nano",
     "bg": "dark",
-    "appTheme": True,
+    "appTheme": False,
 }
 
 COLOR_TOKEN = re.compile(
@@ -69,8 +79,8 @@ def write_json(path, data, atomic=True):
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(data, indent=2) + "\n"
     if not atomic:
-        # The theme path unit watches these two; writing in place keeps the
-        # inode stable so a watcher does not see a rename.
+        # Quickshell's FileView watches these two by inode; replacing the file
+        # would drop the watch, so write through the existing one.
         path.write_text(text)
         return
     tmp = path.with_name(path.name + ".tmp")
@@ -83,19 +93,12 @@ def read_flags():
     for key, value in DEFAULT_FLAGS.items():
         flags.setdefault(key, value)
     changed = False
-    legacy = any(key in flags for key in REMOVED_FLAGS)
     for key in REMOVED_FLAGS:
         if key in flags:
             del flags[key]
             changed = True
-    # The old registry could leave app theming off; an upgrade should land on
-    # the mono GTK override, which is the default now. A later `theme apps off`
-    # is a deliberate choice and survives because the legacy keys are gone.
-    if legacy and not flags.get("appTheme"):
-        flags["appTheme"] = True
-        changed = True
-    if flags["bg"] not in TONES:
-        flags["bg"] = "dark"
+    if flags["paletteMode"] not in PALETTE_MODES:
+        flags["paletteMode"] = "scheme"
         changed = True
     if changed and FLAGS.is_file():
         write_json(FLAGS, flags, atomic=False)
@@ -109,21 +112,152 @@ def write_flags(update):
     return flags
 
 
+def registry():
+    try:
+        return load_registry(REGISTRY)
+    except OSError as exc:
+        raise ThemeError(f"cannot read {REGISTRY}: {exc}") from exc
+
+
+def selectable(reg):
+    return {
+        name: spec
+        for name, spec in reg["schemes"].items()
+        if not spec.get("identity")
+    }
+
+
+def check_scheme(reg, name):
+    schemes = selectable(reg)
+    if name not in schemes:
+        raise ThemeError(
+            f"unknown scheme: {name} (choose from {', '.join(sorted(schemes))})"
+        )
+    return schemes[name]
+
+
 def bundle_key(flags):
-    return f"mono-{flags['bg']}"
+    mode = flags["paletteMode"]
+    if mode == "scheme":
+        name = flags["scheme"]
+        bg = flags["bg"]
+        return f"{name}-{bg}"
+    if mode == "dynamic":
+        return mode
+    raise ThemeError(f"unknown palette mode: {mode}")
 
 
-def bundle_path(flags):
-    return PALETTES / f"{bundle_key(flags)}.json"
+def wallpaper_path():
+    try:
+        pic = WALLPAPER.read_text().strip()
+    except OSError:
+        return None
+    if not pic:
+        return None
+    if Path(pic).suffix.lower() in (".mp4", ".webm", ".mkv", ".mov"):
+        pic = str(WALLPAPER_STILL)
+    return Path(pic) if Path(pic).is_file() else None
+
+
+def run_wallcolors():
+    env = os.environ.copy()
+    env["QUICKSHELL_PALETTE"] = "dynamic"
+    pic = wallpaper_path()
+    if pic is None:
+        raise ThemeError("no wallpaper to derive a dynamic palette from")
+    subprocess.run([sys.executable, str(WALLCOLORS), str(pic)], env=env, check=True)
+
+
+def ensure_bundle(flags, refresh=False):
+    key = bundle_key(flags)
+    path = PALETTES / f"{key}.json"
+    if flags["paletteMode"] == "dynamic":
+        if refresh or not path.is_file():
+            try:
+                run_wallcolors()
+            except subprocess.CalledProcessError:
+                if not path.is_file():
+                    raise ThemeError("dynamic palette generation failed")
+        if not path.is_file():
+            raise ThemeError(f"palette generator wrote no {path}")
+        return path
+    if not path.is_file():
+        raise ThemeError(f"missing Nix palette: {path}")
+    return path
+
+
+def complete_bundle(bundle):
+    """Fill roles a runtime generator did not emit.
+
+    The Nix bundles carry the full set. wallcolors.py only needs the shell
+    tokens, so the shared template roles are derived here rather than copied
+    into a second generator. Anything present wins.
+    """
+    tone = bundle.get("tone") or (
+        "light" if is_light(bundle.get("surface", "#000000")) else "dark"
+    )
+    bundle["tone"] = tone
+    surface = bundle.get("surface", "#211711")
+    cream = bundle.get("cream") or bundle.get("on_surface") or "#e6d6cb"
+    primary = bundle.get("primary", "#e0563b")
+    subtle = bundle.get("subtle") or mix(cream, surface, 0.25)
+    container = bundle.get("surface_container") or surface
+    low = bundle.get("surface_container_low") or surface
+    error = bundle.get("error") or ("#d05a4a" if tone == "dark" else "#b3261e")
+    secondary = bundle.get("secondary") or mix(primary, cream, 0.30)
+    tertiary = bundle.get("tertiary") or mix(primary, cream, 0.50)
+    high = bundle.get("surface_container_high") or (
+        mix(surface, cream, 0.08) if tone == "dark" else darken(surface, 0.04)
+    )
+    bright = bundle.get("bright") or (
+        lighten(cream, 0.35) if tone == "dark" else darken(cream, 0.35)
+    )
+
+    defaults = {
+        "background": surface,
+        "on_background": cream,
+        "on_surface": cream,
+        "surface_variant": container,
+        "surface_container_low": low,
+        "surface_container_high": high,
+        "surface_container_lowest": darken(low, 0.12)
+        if tone == "dark"
+        else lighten(low, 0.12),
+        "on_surface_variant": subtle,
+        "outline": mix(cream, surface, 0.55),
+        "outline_variant": mix(cream, surface, 0.78),
+        "primary": primary,
+        "on_primary": on(primary),
+        "primary_container": mix(surface, primary, 0.45),
+        "on_primary_container": mix(primary, cream, 0.55),
+        "bright": bright,
+        "dim": mix(cream, surface, 0.42),
+        "faint": mix(cream, surface, 0.58),
+        "icon_dim": mix(cream, surface, 0.12),
+        "secondary": secondary,
+        "on_secondary": surface,
+        "secondary_container": mix(surface, secondary, 0.35),
+        "on_secondary_container": mix(secondary, cream, 0.55),
+        "tertiary": tertiary,
+        "on_tertiary": surface,
+        "tertiary_container": mix(surface, tertiary, 0.35),
+        "on_tertiary_container": mix(tertiary, cream, 0.55),
+        "error": error,
+        "on_error": on(error),
+        "error_container": mix(surface, error, 0.35),
+        "on_error_container": mix(error, cream, 0.55),
+        "shadow": "#000000",
+    }
+    for key, value in defaults.items():
+        bundle.setdefault(key, value)
+    return bundle
 
 
 def load_bundle(path):
     bundle = read_json(path, None)
     if not isinstance(bundle, dict):
         raise ThemeError(f"cannot read palette bundle: {path}")
-    if not bundle.get("tone"):
-        raise ThemeError(f"palette bundle has no tone: {path}")
-    return bundle
+    return complete_bundle(bundle)
 
 
 def write_current(bundle):
@@ -189,12 +323,6 @@ def validate_manifest(entries):
         target = entry.get("output_path")
         if not target:
             raise ThemeError(f"manifest entry {name} has no output_path")
-        scope = entry.get("scope") or "desktop"
-        if scope not in ("desktop", "terminal"):
-            raise ThemeError(
-                f"manifest entry {name} has an unknown scope: {scope} "
-                f"(use desktop or terminal)"
-            )
         path = Path(target)
         if not path.is_absolute():
             raise ThemeError(f"manifest entry {name} has a relative output_path: {path}")
@@ -237,13 +365,14 @@ def rewrite(path, text):
 
 def render_manifest(bundle):
     changed = []
-    scope_bundles = {"desktop": bundle, "terminal": bundle}
     for entry in manifest_entries():
         source = Path(entry.get("input_path", ""))
         target = Path(entry.get("output_path", ""))
+        if not entry.get("output_path"):
+            raise ThemeError(f"manifest entry {entry.get('name')} has no output_path")
         if not source.is_file():
             raise ThemeError(f"missing template: {source}")
-        text = render(source.read_text(), scope_bundles[entry.get("scope") or "desktop"])
+        text = render(source.read_text(), bundle)
         if rewrite(target, text):
             changed.append(str(target))
         # Run the hook even when the text is byte-identical: it is what makes a
@@ -272,49 +401,6 @@ def app_theme(bundle, enabled):
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(wanted + "\n")
     return True
-
-
-def info_theme():
-    info = read_json(INFO, {})
-    theme = info.get("theme") if isinstance(info, dict) else None
-    return theme if isinstance(theme, dict) else {}
-
-
-def set_gsetting(key, value):
-    if shutil.which("gsettings") is None:
-        return
-    subprocess.run(
-        ["gsettings", "set", "org.gnome.desktop.interface", key, value],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-
-
-def apply_desktop_extras(bundle):
-    light = bundle.get("tone") == "light"
-    theme = info_theme()
-    icons = theme.get("icons") or {}
-    cursor = theme.get("cursor") or {}
-
-    icon = icons.get("lightName" if light else "name") or (
-        "Mono" if light else "Mono-Dark"
-    )
-    cursor_name = cursor.get("lightName" if light else "name") or (
-        "phinger-cursors-light" if light else "phinger-cursors-dark"
-    )
-    size = str(cursor.get("size") or 32)
-
-    set_gsetting("icon-theme", icon)
-    set_gsetting("cursor-theme", cursor_name)
-
-    if shutil.which("hyprctl") is not None:
-        subprocess.run(
-            ["hyprctl", "setcursor", cursor_name, size],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
 
 
 def nvim_expr(editor, bg):
@@ -385,34 +471,20 @@ def reload_foot():
         foot_ini.touch()
 
 
-def switch_wallpaper(tone):
-    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
-        return
-    if not WALLPAPER.is_file() or not os.access(WALLPAPER, os.X_OK):
-        return
-    subprocess.run(
-        ["bash", str(WALLPAPER), "tone", tone],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=60,
-        check=False,
-    )
-
-
-def apply():
+def apply(refresh=False):
     flags = read_flags()
-    bundle = load_bundle(bundle_path(flags))
+    path = ensure_bundle(flags, refresh=refresh)
+    bundle = load_bundle(path)
     write_current(bundle)
     changed = render_manifest(bundle)
     app_theme(bundle, bool(flags.get("appTheme")))
-    apply_desktop_extras(bundle)
     push_nvim(bundle)
     reload_foot()
     return changed, bundle, flags
 
 
-def cmd_apply(_args):
-    changed, bundle, _ = apply()
+def cmd_apply(args):
+    changed, bundle, _ = apply(refresh=args.refresh)
     for path in changed:
         print(f"rendered {path}")
     print(f"applied {bundle.get('key')}")
@@ -424,25 +496,48 @@ def cmd_render(_args):
     if CURRENT.is_file():
         bundle = load_bundle(CURRENT)
     else:
-        bundle = load_bundle(bundle_path(flags))
+        bundle = load_bundle(ensure_bundle(flags))
     write_current(bundle)
     for path in render_manifest(bundle):
         print(f"rendered {path}")
     return 0
 
 
-def cmd_bg(args):
-    tone = args.tone
-    if tone is None:
-        print(read_flags()["bg"])
-        return 0
-    if tone not in TONES:
-        raise ThemeError(f"unknown background: {tone} (use light or dark)")
-    write_flags({"bg": tone})
+def cmd_source(args):
+    reg = registry()
+    mode = args.mode
+    if mode not in PALETTE_MODES:
+        raise ThemeError(f"unknown palette mode: {mode} (use scheme or dynamic)")
+    if mode == "scheme":
+        check_scheme(reg, read_flags()["scheme"])
+    write_flags({"paletteMode": mode})
+    changed, bundle, _ = apply(refresh=mode == "dynamic")
+    for path in changed:
+        print(f"rendered {path}")
+    print(f"applied {bundle.get('key')}")
+    return 0
+
+
+def cmd_set(args):
+    reg = registry()
+    name = args.scheme or reg["default"]["scheme"]
+    check_scheme(reg, name)
+    write_flags({"scheme": name, "paletteMode": "scheme"})
     changed, bundle, _ = apply()
     for path in changed:
         print(f"rendered {path}")
-    switch_wallpaper(tone)
+    print(f"applied {bundle.get('key')}")
+    return 0
+
+
+def cmd_bg(args):
+    tone = args.tone or registry()["default"]["bg"]
+    if tone not in ("light", "dark"):
+        raise ThemeError(f"unknown background: {tone} (use light or dark)")
+    write_flags({"bg": tone, "paletteMode": "scheme"})
+    changed, bundle, _ = apply()
+    for path in changed:
+        print(f"rendered {path}")
     print(f"applied {bundle.get('key')}")
     return 0
 
@@ -453,34 +548,43 @@ def cmd_apps(args):
     bundle = (
         load_bundle(CURRENT)
         if CURRENT.is_file()
-        else load_bundle(bundle_path(flags))
+        else load_bundle(ensure_bundle(flags))
     )
     app_theme(bundle, args.mode == "on")
     return 0
 
 
+def cmd_list(_args):
+    for name in sorted(selectable(registry())):
+        print(name)
+    return 0
+
+
 def cmd_status(_args):
     flags = read_flags()
-    path = bundle_path(flags)
+    key = bundle_key(flags)
+    path = PALETTES / f"{key}.json"
     bundle = read_json(path, {})
-    print(f"bg:       {flags['bg']}")
-    print(f"palette:  {path}{'' if path.is_file() else ' (missing)'}")
-    print(f"current:  {CURRENT}{'' if CURRENT.is_file() else ' (missing)'}")
-    print(f"editor:   {bundle.get('editor', '(none)')}")
-    print(f"theme:    {FOOT_THEME}{'' if FOOT_THEME.is_file() else ' (missing)'}")
+    print(f"mode:    {flags['paletteMode']}")
+    print(f"scheme:  {flags['scheme']}")
+    print(f"bg:      {flags['bg']}")
+    print(f"key:     {key}")
+    print(f"bundle:  {path}{'' if path.is_file() else ' (missing)'}")
+    print(f"current: {CURRENT}{'' if CURRENT.is_file() else ' (missing)'}")
+    print(f"editor:  {bundle.get('editor', '(none)')}")
+    print(f"theme:   {FOOT_THEME}{'' if FOOT_THEME.is_file() else ' (missing)'}")
     return 0
 
 
 def cmd_check(_args):
+    reg = registry()
     errors = []
-    for tone in TONES:
-        path = PALETTES / f"mono-{tone}.json"
-        if not path.is_file():
-            errors.append(f"missing palette bundle: {path}")
-        foot = CONFIG_ROOT / "config" / "foot" / "themes" / f"mono-{tone}.ini"
-        if not foot.is_file():
-            errors.append(f"missing foot theme: {foot}")
-
+    themes = CONFIG_ROOT / "foot" / "themes"
+    for name in selectable(reg):
+        for mode in ("dark", "light"):
+            path = themes / f"{name}-{mode}.ini"
+            if not path.is_file():
+                errors.append(f"missing scheme file: {path}")
     if not MANIFEST.is_file():
         errors.append(f"missing manifest: {MANIFEST}")
     else:
@@ -489,17 +593,18 @@ def cmd_check(_args):
             if not source.is_file():
                 errors.append(f"missing template: {source}")
 
-    if not errors:
-        for tone in TONES:
-            path = PALETTES / f"mono-{tone}.json"
-            bundle = load_bundle(path)
-            try:
-                for entry in manifest_entries():
-                    source = Path(entry.get("input_path", ""))
-                    if source.is_file():
-                        render(source.read_text(), bundle)
-            except ThemeError as exc:
-                errors.append(str(exc))
+    path = CURRENT if CURRENT.is_file() else PALETTES / "washi.json"
+    if not path.is_file():
+        errors.append(f"missing palette bundle: {path}")
+    else:
+        bundle = load_bundle(path)
+        try:
+            for entry in manifest_entries():
+                source = Path(entry.get("input_path", ""))
+                if source.is_file():
+                    render(source.read_text(), bundle)
+        except ThemeError as exc:
+            errors.append(str(exc))
 
     for error in errors:
         print(error, file=sys.stderr)
@@ -513,8 +618,20 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="theme.py")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("apply").set_defaults(func=cmd_apply)
-    sub.add_parser("render").set_defaults(func=cmd_render)
+    p = sub.add_parser("apply")
+    p.add_argument("--refresh", action="store_true")
+    p.set_defaults(func=cmd_apply)
+
+    p = sub.add_parser("render")
+    p.set_defaults(func=cmd_render)
+
+    p = sub.add_parser("source")
+    p.add_argument("mode")
+    p.set_defaults(func=cmd_source)
+
+    p = sub.add_parser("set")
+    p.add_argument("scheme", nargs="?")
+    p.set_defaults(func=cmd_set)
 
     p = sub.add_parser("bg")
     p.add_argument("tone", nargs="?")
@@ -524,6 +641,7 @@ def main(argv=None):
     p.add_argument("mode", choices=("on", "off"))
     p.set_defaults(func=cmd_apps)
 
+    sub.add_parser("list").set_defaults(func=cmd_list)
     sub.add_parser("status").set_defaults(func=cmd_status)
     sub.add_parser("check").set_defaults(func=cmd_check)
 

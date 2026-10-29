@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Theme GTK3 and GTK4 apps from the active mono bundle.
-
-theme.py calls this with --apps on/off. The palette itself comes from
-$XDG_STATE_HOME/magi/theme/palettes/current.json, so the app theme follows the
-same light/dark variant as everything else. Nothing here reads a wallpaper.
+"""
+Generate the rice colour set from a wallpaper and fan it out to the consumers.
+One histogram pass yields both the area-dominant chromatic hue (binned by hue
+family so a small vivid accent never hijacks the theme) and the mean lightness.
+The mean lightness drives the pill's whole tone: a bright wallpaper makes a light
+pill with dark text, a dark or OLED-black one makes a near-black pill with cream
+text, so the surfaces and the text flip together for contrast across the full
+range. The dominant hue tints every tier in HSL. An achromatic wallpaper drops to
+a neutral grey ramp. matugen builds the terminal base16, and the same bundle
+carries the pill surfaces, accent and contrast-matched text, so foot, the lock
+and the shell all read one file for the dynamic source.
 """
 import colorsys
 import fcntl
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "magi" / "theme"
+CACHE = Path.home() / ".cache" / "quickshell"
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "quickshell"
 PALETTES = STATE / "palettes"
 GTK4 = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "gtk-4.0"
 GTK3 = GTK4.parent / "gtk-3.0"
@@ -23,18 +31,128 @@ THEMES = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share
 OVERRIDES = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "flatpak" / "overrides" / "global"
 FLATPAK_FS = ["xdg-config/gtk-4.0:ro", "xdg-data/themes:ro"]
 IFACE = "org.gnome.desktop.interface"
-MARK = "/** magi app theme, turn it off with `magi theme apps off` */\n"
-MAGI_THEMES = ["Magi-a", "Magi-b", "Magi-base", "Magi-base-dark"]
-MONO_FALLBACK = {
-    "surface": "#000000",
-    "surface_container_low": "#121212",
-    "surface_container": "#1a1a1a",
-    "surface_container_high": "#242424",
-    "outline_variant": "#3a3a3a",
-    "primary": "#e6e6e6",
-    "cream": "#f2f2f2",
-    "bright": "#ffffff",
-}
+MARK = "/** Quickshell app theme, turn it off in Settings > Appearance */\n"
+QUICKSHELL_THEMES = ["Quickshell-a", "Quickshell-b", "Quickshell-base", "Quickshell-base-dark"]
+WASHI_FALLBACK = {"surface": "#211711", "surface_container_low": "#221813", "surface_container": "#2c2118",
+                  "surface_container_high": "#2e231b", "outline_variant": "#3a2a22", "primary": "#e0563b",
+                  "cream": "#e6d6cb", "bright": "#fff6f0"}
+
+SURF_NAMES = ["surface", "surface_container_low", "surface_container",
+              "surface_container_high", "surface_container_highest", "outline_variant"]
+DARK_STEPS = [0.0, 0.022, 0.038, 0.065, 0.100, 0.225]
+LIGHT_STEPS = [0.0, -0.045, -0.075, -0.115, -0.160, -0.340]
+TEXT_KEYS = ["cream", "bright", "subtle", "dim", "faint", "icon_dim", "tick_rest"]
+DARK_TEXT = [(0.90, 0.05), (0.97, 0.03), (0.73, 0.07), (0.54, 0.06),
+             (0.44, 0.05), (0.81, 0.07), (0.75, 0.08)]
+LIGHT_TEXT = [(0.20, 0.18), (0.10, 0.20), (0.36, 0.14), (0.48, 0.10),
+              (0.56, 0.08), (0.28, 0.12), (0.34, 0.12)]
+
+
+def analyze(wallpaper):
+    out = subprocess.run(
+        ["magick", wallpaper, "-alpha", "off", "-resize", "200x200", "-colors", "48",
+         "-format", "%c", "histogram:info:-"],
+        capture_output=True, text=True).stdout
+    buckets, total, lum, chroma = {}, 0, 0.0, 0
+    for line in out.splitlines():
+        m = re.search(r"\s*(\d+):\s*\([^)]*\)\s*#([0-9A-Fa-f]{6})", line)
+        if not m:
+            continue
+        count, hex_str = int(m.group(1)), m.group(2)
+        r, g, b = (int(hex_str[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        total += count
+        lum += count * l
+        if s < 0.15 or l < 0.05 or l > 0.92:
+            continue
+        chroma += count
+        bucket = buckets.setdefault((int(h * 360) // 30) % 12, {"wsat": 0.0, "best": None})
+        bucket["wsat"] += count * s
+        score = count * s * (1 if 0.12 < l < 0.55 else 0.4)
+        if not bucket["best"] or score > bucket["best"][0]:
+            bucket["best"] = (score, h, s)
+    mean_l = lum / total if total else 0.0
+    if not buckets or chroma < 0.08 * total:
+        return None, 0.0, mean_l
+    win = max(buckets.values(), key=lambda v: v["wsat"])
+    return win["best"][1], win["best"][2], mean_l
+
+
+def matugen(source_hex):
+    out = subprocess.run(
+        ["matugen", "color", "hex", source_hex, "-m", "dark", "-j", "hex"],
+        capture_output=True, text=True, check=True,
+    )
+    return json.loads(out.stdout)
+
+
+def tint(hue, sat, light):
+    r, g, b = colorsys.hls_to_rgb(hue % 1.0, max(0.0, min(1.0, light)), max(0.0, min(1.0, sat)))
+    return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
+
+def lerp(x, x0, x1, y0, y1):
+    t = max(0.0, min(1.0, (x - x0) / (x1 - x0)))
+    return y0 + t * (y1 - y0)
+
+
+def render_fastfetch(pill):
+    """
+    Recolour the fastfetch readout from the same pill palette. fastfetch has no
+    daemon, so writing the rendered config is enough, the next run picks it up.
+    The accent drives the keys and the torii, the surface ramp the lantern body,
+    and a dim text tone the section rules, so it tracks the wallpaper like the
+    pill and terminal do.
+    """
+    ff = Path.home() / ".config" / "fastfetch"
+    tmpl = ff / "config.jsonc.in"
+    if not tmpl.is_file():
+        print("wallcolors: config.jsonc.in missing in ~/.config/fastfetch, skipping "
+              "fastfetch recolour (apply the Quickshell update or re-run the installer)",
+              file=sys.stderr)
+        return
+    seq = lambda h: "%d;%d;%d" % tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+    repl = {
+        "__LANTERN__": str(ff / "lantern.txt"),
+        "__KEYS__": seq(pill["primary"]),
+        "__SEP__": seq(pill["dim"]),
+        "__LOGO1__": seq(pill["primary"]),
+        "__LOGO2__": seq(pill["on_primary_container"]),
+        "__LOGO3__": seq(pill["surface_container"]),
+        "__LOGO4__": seq(pill["surface_container_high"]),
+        "__LOGO5__": seq(pill["subtle"]),
+        "__LOGO6__": seq(pill["outline"]),
+        "__LOGO7__": seq(pill["bright"]),
+    }
+    out = tmpl.read_text()
+    for key, val in repl.items():
+        out = out.replace(key, val)
+    (ff / "config.jsonc").write_text(out)
+
+
+def flags():
+    try:
+        return json.loads((STATE / "flags.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def palette_mode():
+    return os.environ.get("QUICKSHELL_PALETTE") or flags().get("paletteMode", "scheme")
+
+
+def current_bundle():
+    """The bundle theme.py last applied, so GTK follows the active source."""
+    for path in (PALETTES / "current.json", CACHE / "colors.json"):
+        try:
+            return json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def active_palette(pill):
+    return current_bundle() or pill
 
 
 def gget(key):
@@ -64,7 +182,7 @@ def notify(summary, body):
     return subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
                            "--object-path", "/org/freedesktop/Notifications",
                            "--method", "org.freedesktop.Notifications.Notify",
-                           "magi", "0", "", summary, body, "[]", "{}", "8000"],
+                           "Quickshell", "0", "", summary, body, "[]", "{}", "8000"],
                           capture_output=True).returncode == 0
 
 
@@ -133,7 +251,7 @@ def base_theme(light):
     src = find_theme("adw-gtk3" if light else "adw-gtk3-dark")
     if not src:
         return None
-    dst = THEMES / ("Magi-base" if light else "Magi-base-dark")
+    dst = THEMES / ("Quickshell-base" if light else "Quickshell-base-dark")
     css = dst / "gtk-3.0" / "gtk.css"
     if not css.is_file() or (src / "gtk-3.0" / "gtk.css").stat().st_mtime > css.stat().st_mtime:
         shutil.rmtree(dst, ignore_errors=True)
@@ -162,7 +280,7 @@ def enable_apps():
 
 
 def remind_backups():
-    """The first apply can run at login before magi-notifyd owns the notification bus, so the toast retries until it lands."""
+    """The first apply can run at login before the pill owns the notification bus, so the toast retries until it lands."""
     f = STATE / "apptheme.json"
     state = json.loads(f.read_text())
     if state.get("backups") and not state.get("notified") and notify(
@@ -174,7 +292,7 @@ def remind_backups():
 
 
 def apply_apps(p):
-    """Theme GTK3 and GTK4 apps from the mono palette; the alternating Magi-a/b name makes running GTK3 apps reload."""
+    """Theme GTK3 and GTK4 apps from the pill palette; the alternating Quickshell-a/b name makes running GTK3 apps reload."""
     if shutil.which("gsettings") is None:
         print("wallcolors: app theme skipped: gsettings not found", file=sys.stderr)
         return
@@ -184,19 +302,19 @@ def apply_apps(p):
     light = colorsys.rgb_to_hls(r, g, b)[1] > 0.5
     colors = gtk_colors(p, light)
     root = ":root { --accent-bg-color: @accent_bg_color; --accent-fg-color: @accent_fg_color; --accent-color: %s; }\n"
-    changed = write_if_changed(GTK4 / "magi.css", colors + root % p["primary"])
+    changed = write_if_changed(GTK4 / "quickshell.css", colors + root % p["primary"])
     if not (GTK4 / "gtk.css").exists():
-        write_if_changed(GTK4 / "gtk.css", MARK + '@import url("magi.css");\n')
+        write_if_changed(GTK4 / "gtk.css", MARK + '@import url("quickshell.css");\n')
     base = base_theme(light)
     if base:
         css3 = MARK + f'@import url("../../{base}/gtk-3.0/gtk.css");\n' + colors
         current = gget("gtk-theme")
         try:
-            same = current in MAGI_THEMES[:2] and (THEMES / current / "gtk-3.0" / "gtk.css").read_text() == css3
+            same = current in QUICKSHELL_THEMES[:2] and (THEMES / current / "gtk-3.0" / "gtk.css").read_text() == css3
         except OSError:
             same = False
         if not same:
-            target = "Magi-b" if current == "Magi-a" else "Magi-a"
+            target = "Quickshell-b" if current == "Quickshell-a" else "Quickshell-a"
             write_if_changed(THEMES / target / "gtk-3.0" / "gtk.css", css3)
             write_if_changed(THEMES / target / "gtk-4.0" / "gtk.css", f'@import url("../../{base}/gtk-4.0/gtk.css");\n')
             gset("gtk-theme", target)
@@ -214,20 +332,20 @@ def disable_apps():
     css = GTK4 / "gtk.css"
     if css.is_file() and css.read_text(errors="ignore").startswith(MARK):
         css.unlink()
-    (GTK4 / "magi.css").unlink(missing_ok=True)
-    if state is None and gget("gtk-theme") not in MAGI_THEMES:
+    (GTK4 / "quickshell.css").unlink(missing_ok=True)
+    if state is None and gget("gtk-theme") not in QUICKSHELL_THEMES:
         return
     state = state or {}
     for bak in map(Path, state.get("backups", [])):
         if bak.is_file() and not (bak.parent / "gtk.css").exists():
             bak.rename(bak.parent / "gtk.css")
     theme = state.get("gtk-theme", "")
-    if theme in ("", "Adwaita", *MAGI_THEMES):
+    if theme in ("", "Adwaita", *QUICKSHELL_THEMES):
         theme = "adw-gtk3-dark" if find_theme("adw-gtk3-dark") else "Adwaita-dark"
     gset("gtk-theme", theme)
     scheme = state.get("color-scheme", "")
     set_scheme("prefer-dark" if scheme in ("", "default") else scheme, True)
-    for name in MAGI_THEMES:
+    for name in QUICKSHELL_THEMES:
         shutil.rmtree(THEMES / name, ignore_errors=True)
     if state.get("flatpak"):
         try:
@@ -249,17 +367,12 @@ def disable_apps():
     (STATE / "apptheme.json").unlink(missing_ok=True)
 
 
-def current_bundle():
-    try:
-        return json.loads((PALETTES / "current.json").read_text())
-    except (OSError, ValueError):
-        return None
-
-
-def sync_apps():
+def sync_apps(pill, need_flag=False):
     try:
         with apps_lock():
-            apply_apps(current_bundle() or MONO_FALLBACK)
+            if need_flag and not flags().get("appTheme"):
+                return
+            apply_apps(active_palette(pill))
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"wallcolors: app theme skipped: {exc}", file=sys.stderr)
 
@@ -272,9 +385,73 @@ def main():
             with apps_lock():
                 disable_apps()
             return 0
-        sync_apps()
+        sync_apps(current_bundle() or WASHI_FALLBACK)
         return 0
-    return 1
+
+    mode = palette_mode()
+    if mode != "dynamic":
+        return 0
+
+    wallpaper = sys.argv[1]
+    if not Path(wallpaper).is_file():
+        return 0
+    hue, sat, mean_l = analyze(wallpaper)
+    chromatic = hue is not None
+    if not chromatic:
+        hue, sat = 0.09, 0.0
+    CACHE.mkdir(parents=True, exist_ok=True)
+
+    light = mean_l >= 0.40
+    surf_sat = min(sat, 0.26) if light else min(max(sat, 0.30 if chromatic else 0.0), 0.45)
+    acc_sat = (min(sat + 0.18, 0.85) if light else min(max(sat, 0.30) + 0.12, 0.82)) if chromatic else 0.05
+    if light:
+        base = lerp(mean_l, 0.40, 0.66, 0.80, 0.93)
+        steps, text, acc_l, deep_l, glow_l = LIGHT_STEPS, LIGHT_TEXT, 0.42, 0.30, 0.55
+    else:
+        base = lerp(mean_l, 0.0, 0.40, 0.045, 0.20)
+        steps, text, acc_l, deep_l, glow_l = DARK_STEPS, DARK_TEXT, 0.70, 0.34, 0.86
+
+    pill = {name: tint(hue, surf_sat, base + step) for name, step in zip(SURF_NAMES, steps)}
+    pill["primary"] = tint(hue, acc_sat, acc_l)
+    pill["primary_container"] = tint(hue, min(acc_sat + 0.08, 0.9), deep_l)
+    pill["on_primary_container"] = tint(hue, min(acc_sat, 0.45), glow_l)
+    pill["outline"] = tint(hue, surf_sat, base + (-0.35 if light else 0.35))
+    for key, (lit, st) in zip(TEXT_KEYS, text):
+        pill[key] = tint(hue, st, lit)
+    (CACHE / "colors.json").write_text(json.dumps(pill, indent=2) + "\n")
+    render_fastfetch(pill)
+
+    try:
+        b = {k: v["dark"]["color"] for k, v in
+             matugen(tint(hue, sat, 0.45) if chromatic else "#787878")["base16"].items()}
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        print(f"wallcolors: matugen failed: {exc}", file=sys.stderr)
+        return 1
+
+    terminal = {
+        "background": b["base00"],
+        "foreground": b["base07"],
+        "ansi": [b[f"base{i:02x}"] for i in range(16)],
+        "cursor": pill["primary"],
+        "selection_background": b["base02"],
+        "selection_foreground": b["base07"],
+        "urls": b["base0d"],
+    }
+    bundle = {
+        **pill,
+        "key": mode,
+        "source": mode,
+        "scheme": mode,
+        "tone": "light" if light else "dark",
+        "editor": "generated",
+        "terminal": terminal,
+    }
+    PALETTES.mkdir(parents=True, exist_ok=True)
+    path = PALETTES / f"{mode}.json"
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n")
+    tmp.replace(path)
+    return 0
 
 
 if __name__ == "__main__":

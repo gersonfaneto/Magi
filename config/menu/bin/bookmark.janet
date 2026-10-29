@@ -92,7 +92,7 @@
 (defn- open-url [url]
   (when url
     (echof "Opening: %s" url)
-    (menu/launch "xdg-open" url)))
+    (os/spawn ["xdg-open" url] :pd)))
 
 (defn- select [profile reload?]
   (def items @[{:label "Reload bookmarks ->" :icon "reload" :data "@reload"}])

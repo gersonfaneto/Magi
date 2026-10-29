@@ -1,6 +1,6 @@
 #!/usr/bin/env janet
-# Regression tests for config/menu/bin/rbw.janet: the fsel menu rows, entry and
-# field picks, and the clipboard/notification hand-off.
+# Regression tests for config/menu/bin/rbw.janet: the Quickshell menu payloads,
+# entry and field picks, and the clipboard/notification hand-off.
 
 (use judge)
 (use sh)
@@ -51,8 +51,6 @@
                         "RBW_TEST_EDIT_FILE" edited
                         "RBW_TEST_CLIP_LOG" clipargs
                         "RBW_TEST_LOCKED" locked
-                        "RBW_TEST_PICK_LOG" (path/join dir "picked")
-                        "EDITOR" (path/join stubs "test-editor")
                         "RBW_TEST_SYNC_FAIL" (if (opts :sync-fail) "1" "")]
       (os/execute @[janet script ;args] :p)))
   (var waited 0)

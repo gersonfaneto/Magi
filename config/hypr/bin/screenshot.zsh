@@ -6,8 +6,9 @@
 #
 # DESCRIPTION:
 #   Captures a screenshot with grim (selecting through `magi .slurp`), compresses
-#   it with pngquant, then copies it to your clipboard. It is also the headless
-#   capture path `magi wm ocr` and friends rely on.
+#   it with pngquant, then copies it to your clipboard. To draw on the screen,
+#   use the vendored `rishot` editor (SUPER + D); this script is for the
+#   headless `-o FILE` captures `magi wm ocr` and friends rely on.
 #
 # OPTIONS:
 #   -o, --output FILE @files

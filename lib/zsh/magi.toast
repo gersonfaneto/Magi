@@ -6,10 +6,10 @@
 #             (info|warn|error) SUMMARY [BODY]
 #
 # DESCRIPTION:
-#   Records a notification under magi's name in magi's notification log. error
-#   is critical, the rest are normal. magi-notifyd owns the bus, so this is a
-#   plain notify-send; no-op when notify-send isn't around (a tty, another
-#   shell). Read the log with `magi notify`.
+#   Pops a notification under magi's name. error is critical, the rest are
+#   normal. The Quickshell pill owns org.freedesktop.Notifications, so this is
+#   a plain notify-send; no-op when notify-send isn't around (a tty, another
+#   shell).
 #
 # OPTIONS:
 #   -a NAME

@@ -14,3 +14,7 @@ local stamp=$(magi path runtime session-ending)
 mkdir -p ${stamp:h} && : >|$stamp
 
 magi.toast warn "Shutting down..."
+
+# Fade out. Plus the ~130ms quickshell takes to cold-start.
+magi .fade -d 1250 out &
+wait

@@ -11,7 +11,7 @@ typeset -g POWERLEVEL9K_DIR_FOREGROUND='{{colors.primary.hex}}'
 typeset -g POWERLEVEL9K_DIR_ANCHOR_FOREGROUND='{{colors.primary.hex}}'
 typeset -g POWERLEVEL9K_DIR_SHORTENED_FOREGROUND='{{colors.on_surface_variant.hex}}'
 
-# Prompt symbol: lighter gray on success, darker gray on failure.
+# Prompt symbol: green on success, red on failure.
 typeset -g POWERLEVEL9K_PROMPT_CHAR_OK_{VIINS,VICMD,VIVIS,VIOWR}_FOREGROUND='{{terminal.ansi2.hex}}'
 typeset -g POWERLEVEL9K_PROMPT_CHAR_ERROR_{VIINS,VICMD,VIVIS,VIOWR}_FOREGROUND='{{terminal.ansi1.hex}}'
 

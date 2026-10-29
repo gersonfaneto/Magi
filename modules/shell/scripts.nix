@@ -6,9 +6,9 @@
 # edit takes effect without a rebuild. The md2* frontends ride on
 # modules.shell.pandoc's data dir ($XDG_DATA_HOME/pandoc).
 #
-# setbg (with its getbg/suggestbg/checkbg/syncbg helpers) is a thin frontend to
-# `magi theme bg`, which switches the whole session between the mono light and
-# dark variants and renders the active bundle for every consumer.
+# setcolor/setbg (with their getbg/suggestbg/checkbg/syncbg helpers) are thin
+# frontends to `magi theme`, which owns the static theme sets in
+# config/{foot,highlight}/themes and renders the active one for every app.
 {
   self,
   lib,
@@ -50,7 +50,8 @@ with self.lib; let
     "room" # open a shell in a temporary directory
     "run" # compile-and-run a C/C++ file
     "serve" # serve a directory over HTTP
-    "setbg" # switch the whole session between light and dark
+    "setbg" # set the light/dark tone for the whole desktop
+    "setcolor" # set the colorscheme for the whole desktop
     "showcolors" # print the terminal's 16 colors
     "suggestbg" # print the bg suggested by sunrise/sunset (or the clock)
     "syncbg" # sync apps' bg with the system bg
@@ -92,13 +93,18 @@ in {
       map (name: nameValuePair ".local/bin/${name}" "${config.magi.configDir}/bin/${name}") scripts
     );
 
-    # The fzf previewer reads its theme from ~/.highlight/themes; theme.py
-    # renders highlight.theme from the terminal bundle into the same directory,
-    # so nothing writes into the checkout.
+    # setcolor/setbg used to drop dark.theme/light.theme/highlight.theme
+    # symlinks here. theme.py now renders highlight.theme from the active bundle
+    # into the same directory, so the fzf previewer's --config-file keeps
+    # working without writing into the checkout.
+    home.file.".highlight/themes" = {
+      source = "${self.configDir}/highlight/themes";
+      recursive = true;
+    };
+
     modules.wm.theme.files.highlight = {
       input_path = "${config.magi.configDir}/theme/highlight.template.theme";
       output_path = "${config.home.dir}/.highlight/themes/highlight.theme";
-      scope = "terminal";
     };
   };
 }

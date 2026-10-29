@@ -1,7 +1,8 @@
 """Shared colour and terminal-palette helpers for the theme pipeline.
 
-The Nix build (palette.py) needs HSV/HLS mixing and one idea of a terminal
-palette, so they live here instead of being copied into the generator.
+The Nix build (quickshell-palette.py) and the runtime generator
+(wallcolors.py/theme.py) both need the same HSV/HLS mixing and the same idea of
+a terminal palette, so they live here instead of being copied between scripts.
 """
 
 import colorsys
@@ -72,6 +73,19 @@ def shift(c, degrees, sat=1.0, light=1.0):
     return from_hls(h + degrees / 360.0, l * light, s * sat)
 
 
+def load_registry(path):
+    """The scheme registry as {name: {...}}, identity and all."""
+    import json
+
+    data = json.loads(Path(path).read_text())
+    if not isinstance(data.get("schemes"), dict):
+        raise SystemExit(f"{path}: no schemes object")
+    for name, spec in data["schemes"].items():
+        if not spec.get("identity") and "accent" not in spec:
+            raise SystemExit(f"{path}: {name} has no accent")
+    return data
+
+
 def read_foot_theme(path):
     """A foot theme file as the pipeline's terminal bundle section.
 
@@ -107,3 +121,34 @@ def read_foot_theme(path):
         "selection_foreground": get("selection-foreground", fg),
         "urls": get("urls", ansi[4]),
     }
+
+
+# The fixed washi identity needs a terminal palette too, or falling back to it
+# leaves foot on whatever scheme was last active. The values mirror the WASHI
+# roles in quickshell-palette.py; keep them in sync with it.
+WASHI_TERMINAL = {
+    "background": "#211711",
+    "foreground": "#e6d6cb",
+    "ansi": [
+        "#1b120d",
+        "#c0442b",
+        "#8a9a5b",
+        "#f5bd6f",
+        "#6d8a96",
+        "#a06a7a",
+        "#7f9f9f",
+        "#b9a99e",
+        "#594636",
+        "#e0563b",
+        "#a7b87a",
+        "#ffd9a0",
+        "#8fa9b5",
+        "#c08a9a",
+        "#9fbfbf",
+        "#fff6f0",
+    ],
+    "cursor": "#e0563b",
+    "selection_background": "#3a2a22",
+    "selection_foreground": "#e6d6cb",
+    "urls": "#8fa9b5",
+}

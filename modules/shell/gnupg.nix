@@ -15,9 +15,8 @@ in {
     cacheTTL = mkOpt int 3600; # 1hr
 
     # The pinentry the agent spawns. Absolute: the agent doesn't see the
-    # session's PATH. Defaults to the curses prompt, so passphrases are asked
-    # for in the terminal the command was run from.
-    pinentry = mkOpt' (nullOr str) null "The pinentry program gpg-agent spawns (default: pinentry-curses).";
+    # session's PATH. modules.wm.pinentry points this at its Quickshell card.
+    pinentry = mkOpt' (nullOr str) null "The pinentry program gpg-agent spawns (default: pinentry-qt).";
   };
 
   config = mkIf cfg.enable {
@@ -32,12 +31,13 @@ in {
     # GNUPGHOME is ~/.config/gnupg, so this is the conf the agent reads. It has
     # to name the pinentry itself: programs.gnupg.agent.pinentryPackage writes
     # its own conf, which this explicit file replaces, leaving the agent with
-    # no pinentry at all.
+    # no pinentry at all. pinentry-qt matches the session's Qt theming unless
+    # modules.wm.pinentry hands over its Quickshell card.
     home.configFile."gnupg/gpg-agent.conf".text = ''
       pinentry-program ${
         if cfg.pinentry != null
         then cfg.pinentry
-        else getExe pkgs.pinentry-curses
+        else getExe pkgs.pinentry-qt
       }
       default-cache-ttl ${toString cfg.cacheTTL}
       allow-emacs-pinentry

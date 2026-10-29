@@ -1,7 +1,7 @@
 -- config/hypr/modules/binds-default.lua
 --
--- Built-in keybinds. modules/binds.lua is still the place for personal
--- additions; this file holds the defaults.
+-- Built-in keybinds. The Quickshell Keybinds surface owns modules/binds.lua,
+-- not this file, so the defaults here survive a Settings rewrite.
 --
 -- The layout is dwindle, but the Magi extras (per-monitor pad, media/stash/
 -- private scratchpads, screenshots, recorder, OCR) stay on top of Ricelin's
@@ -113,48 +113,53 @@ local function resize_width(spec)
   end
 end
 
--- * Launcher and pickers
+-- * Shell surfaces
 
-hl.bind(mod .. " + Space", cmd("foot --app-id=magi-launcher -e fsel -d"))
-hl.bind(mod .. " + V", cmd("foot --app-id=magi-menu -e magi .clipboard-pick"))
-hl.bind(mod .. " + W", cmd("foot --app-id=magi-menu -e magi .wallpaper-pick"))
-hl.bind(mod .. " + A", cmd("foot --app-id=magi-menu -e pulsemixer"))
+hl.bind(mod .. " + Space", cmd('qs -c pill ipc call pill launcher ""'))
+hl.bind(mod .. " + E", cmd('qs -c pill ipc call pill emoji ""'))
+hl.bind(mod .. " + SHIFT + T", cmd('qs -c pill ipc call pill timer ""'))
+hl.bind(mod .. " + ALT + N", cmd('qs -c pill ipc call pill scratch ""'))
+hl.bind(mod .. " + V", cmd('qs -c pill ipc call pill clipboard ""'))
+hl.bind(mod .. " + W", cmd('qs -c pill ipc call pill wallpaper ""'))
+hl.bind(mod .. " + A", cmd('qs -c pill ipc call pill mixer ""'))
+hl.bind(mod .. " + C", cmd('qs -c pill ipc call pill calendar ""'))
+hl.bind(mod .. " + COMMA", cmd('qs -c pill ipc call pill settings ""'))
+hl.bind(mod .. " + SLASH", cmd('qs -c pill ipc call pill keybinds ""'))
 
 -- * Menus
 
--- The `magi @menu` scripts (config/menu/bin) draw with fsel, which needs a
--- terminal, so each bind opens its own floating foot window. Shift keeps them
--- clear of the focus and movement letters below.
-hl.bind(mod .. " + SHIFT + D", cmd("foot --app-id=magi-menu -e magi @menu file"))
-hl.bind(mod .. " + SHIFT + E", cmd("foot --app-id=magi-menu -e magi @menu emoji"))
-hl.bind(mod .. " + SHIFT + I", cmd("foot --app-id=magi-menu -e magi @menu icon"))
-hl.bind(mod .. " + SHIFT + N", cmd("foot --app-id=magi-menu -e nmtui"))
-hl.bind(mod .. " + SHIFT + U", cmd("foot --app-id=magi-menu -e magi @menu mount"))
-hl.bind(mod .. " + SHIFT + B", cmd("foot --app-id=magi-menu -e magi @menu rbw"))
-hl.bind(mod .. " + ALT + SHIFT + B", cmd("foot --app-id=magi-menu -e magi @menu rbw --new"))
-hl.bind(mod .. " + SHIFT + W", cmd("foot --app-id=magi-menu -e magi .windows"))
-hl.bind(mod .. " + SHIFT + TAB", cmd("foot --app-id=magi-menu -e magi .windows"))
+-- The `magi @menu` scripts (config/menu/bin) draw in the pill's generic Menu
+-- surface. Shift keeps them clear of the focus and movement letters below.
+-- hl.bind(mod .. " + SHIFT + B", cmd("magi @menu bookmark"))
+hl.bind(mod .. " + SHIFT + D", cmd("magi @menu file"))
+hl.bind(mod .. " + SHIFT + E", cmd("magi @menu emoji"))
+hl.bind(mod .. " + SHIFT + I", cmd("magi @menu icon"))
+hl.bind(mod .. " + SHIFT + N", cmd('qs -c pill ipc call pill page "" wifi'))
+hl.bind(mod .. " + SHIFT + U", cmd("magi @menu mount"))
+hl.bind(mod .. " + SHIFT + B", cmd("magi @menu rbw"))
+hl.bind(mod .. " + ALT + SHIFT + B", cmd("magi @menu rbw --new"))
 
 -- * OS and session
 
 hl.bind(mod .. " + SHIFT + R", cmd("magi reload @hypr"))
-hl.bind(mod .. " + CTRL + I", cmd("magi idle toggle"))
 hl.bind(mod .. " + Return", cmd("magi .open-term"))
 hl.bind(mod .. " + SHIFT + Return", cmd("foot || xterm"))
-hl.bind(mod .. " + Escape", zoom(0))
+hl.bind(mod .. " + Escape", function()
+  zoom(0)()
+  hl.exec_cmd("qs -c pill ipc call pill notificationsClear")
+end)
 hl.bind(mod .. " + CTRL + L", cmd(home .. "/.config/hypr/scripts/lock.sh"))
-hl.bind("CTRL + ALT + Delete", cmd("systemctl poweroff"))
+hl.bind("CTRL + ALT + Delete", cmd('qs -c pill ipc call pill power ""'))
 hl.bind(mod .. " + Q", hl.dsp.window.close(), { submap_universal = true })
 hl.bind(mod .. " + SHIFT + Q", hl.dsp.window.kill())
 
 -- * Tools
 
-hl.bind("Print", cmd("magi .screenshot region"))
-hl.bind("SHIFT + Print", cmd("magi .screenshot all"))
-hl.bind(mod .. " + D", cmd("magi .screenshot window"))
+hl.bind(mod .. " + D", cmd("rishot"))
 hl.bind(mod .. " + X", cmd("magi .ocr region"))
-hl.bind(mod .. " + SHIFT + Print", cmd("magi .screencast"))
-hl.bind(mod .. " + G", cmd("magi .gamemode toggle"))
+hl.bind(mod .. " + Print", cmd('qs -c pill ipc call pill quickRecord ""'))
+hl.bind(mod .. " + SHIFT + Print", cmd('qs -c pill ipc call pill recorder ""'))
+hl.bind(mod .. " + G", cmd('qs -c pill ipc call pill gameMode ""'))
 
 -- * Zoom
 
@@ -233,7 +238,7 @@ hl.bind("XF86AudioMute", cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { lo
 hl.bind("XF86AudioMicMute", cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
 hl.bind("XF86MonBrightnessUp", cmd("brightnessctl -e4 -n2 set 10%+"), { locked = true, repeating = true })
 hl.bind("XF86MonBrightnessDown", cmd("brightnessctl -e4 -n2 set 10%-"), { locked = true, repeating = true })
-hl.bind("XF86AudioPlay", cmd("playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioNext", cmd("playerctl next"), { locked = true })
-hl.bind("XF86AudioPrev", cmd("playerctl previous"), { locked = true })
+hl.bind("XF86AudioPlay", hl.dsp.global("quickshell:mediaToggle"), { locked = true })
+hl.bind("XF86AudioNext", hl.dsp.global("quickshell:mediaNext"), { locked = true })
+hl.bind("XF86AudioPrev", hl.dsp.global("quickshell:mediaPrev"), { locked = true })
 hl.bind("XF86PowerOff", dpms(false), { locked = true })

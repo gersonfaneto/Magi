@@ -58,8 +58,7 @@ IFS=$'\t' read -r model effort workspace ctx ctx_used ctx_size \
 # smears grey over whatever follows. 22m turns bold off and touches nothing else.
 local bold=$'\e[1m' unbold=$'\e[22m'
 local off=${(%):-%f} dim=${(%):-%F{8}}
-# The terminal ANSI slots are grayscale, so these follow the mono tone too.
-local -A hue=( ok ${(%):-%F{8}} warn ${(%):-%F{7}} hot ${(%):-%F{1}} )
+local -A hue=( ok ${(%):-%F{green}} warn ${(%):-%F{yellow}} hot ${(%):-%F{red}} )
 # rgb(136,136,136) is promptBorder in Claude Code's dark themes — the grey it
 # rules the prompt pane's top and bottom in. Lifted out of the binary with
 # `grep -ao 'promptBorder:"[^"]*"'`, because nothing in the session JSON says

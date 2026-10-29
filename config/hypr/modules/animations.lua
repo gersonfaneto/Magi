@@ -1,10 +1,11 @@
 -- config/hypr/modules/animations.lua
 --
--- Hyprland animation curves and leaves. Edit this file directly; the
--- checkout's ~/.config/hypr/local/modules shadows it if present.
+-- Hyprland animation curves and leaves. The Quickshell Animation surface
+-- (config/quickshell/pill/AnimationSurface.qml) rewrites this file through
+-- ~/.config/hypr/local/modules and reloads Hyprland.
 --
--- Double-quoted strings on purpose: curve and leaf names carry no quotes, and
--- single-quoting them reads badly.
+-- Double-quoted strings on purpose: the surface's JS helpers match on double
+-- quotes, so the curve and leaf names must not be single-quoted.
 
 hl.config({
   animations = {

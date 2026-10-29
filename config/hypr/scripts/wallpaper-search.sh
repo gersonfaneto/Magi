@@ -101,12 +101,10 @@ download() {
     url="${1:-}"
     [ -n "$url" ] || exit 1
 
-    flags="${XDG_STATE_HOME:-$HOME/.local/state}/magi/theme/flags.json"
+    flags="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/flags.json"
     wpdir=$(jq -r '.wallpaperDir // ""' "$flags" 2>/dev/null || echo "")
-    [ -n "$wpdir" ] || wpdir=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/magi/wallpaper-dir" 2>/dev/null || true)
-    [ -n "$wpdir" ] || wpdir="${XDG_DATA_HOME:-$HOME/.local/share}/magi/wallpapers"
-    # The generated collection lives in the checkout; download beside the user.
-    [ "$wpdir" = "${XDG_DATA_HOME:-$HOME/.local/share}/magi/wallpapers" ] && wpdir="$HOME/Pictures/Wallpapers"
+    [ -n "$wpdir" ] || wpdir=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-wallpaper-dir" 2>/dev/null || true)
+    [ -n "$wpdir" ] || wpdir="$HOME/Pictures/Wallpapers"
     dir="$wpdir/downloads"
     mkdir -p "$dir"
 

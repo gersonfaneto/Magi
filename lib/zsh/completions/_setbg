@@ -1,12 +1,12 @@
 #compdef setbg
 #
 # Completion for setbg (config/bin/setbg). It takes one background word --
-# `light` or `dark`, the variant of the mono theme to switch the session to --
-# or --next to flip it, and prints usage for anything else.
+# `light` or `dark`, the variant of the current scheme to symlink into each
+# app's theme dir -- and prints usage for anything else. Both are always
+# accepted whatever is currently set, so nothing here reads the disk.
 #
 # $fpath carries the live checkout (modules/magi.nix), so this starts completing
 # as soon as `magi reload` has dropped the compdump and a new shell starts.
 
 _arguments \
-  '--next[flip between light and dark]' \
-  '1:background:((light\:"the light variant" dark\:"the dark variant"))'
+  '1:background:((light\:"the light variant of the current scheme" dark\:"the dark variant of the current scheme"))'

@@ -66,12 +66,6 @@
                           :unless (string/has-suffix? ".disabled" file)]
                       (path/no-ext file ;sound-exts)))))
 
-(defn- detach
-  ``Run ARGV in its own session, so a short-lived caller (a menu, say) cannot
-  take it down by closing its terminal.``
-  [argv]
-  (os/spawn ["setsid" "-f" ;argv] :pd))
-
 (defn play-sound
   ``Play NAME from my sound theme; nil if there's no such sound, 0 if the theme
   disables it. Returns play's exit code under WAIT, the detached process
@@ -81,31 +75,29 @@
     (def argv ["play" "-q" ;(opts "-v" volume) file])
     (cond (string/has-suffix? ".disabled" file) 0
           wait (os/execute argv :p)
-          (detach argv))))
+          (os/spawn argv :pd))))
 
 (defn notify [message &named urgency title icon sound id]
-  # Waited, not detached: a menu exits right after notifying, and the daemon
-  # must have taken the message before the caller's terminal goes away.
-  (os/execute ["notify-send"
-               ;(opts "-i" icon)
-               ;(opts "-u" urgency)
-               ;(opts "-r" id)
-               ;(if title
-                  [title message]
-                  [message])]
-              :p)
+  (os/spawn ["notify-send"
+             ;(opts "-i" icon)
+             ;(opts "-u" urgency)
+             ;(opts "-r" id)
+             ;(if title
+                [title message]
+                [message])]
+            :pd)
   (if sound (play-sound sound)))
 
 (defn toast [type message &named details category icon sound]
-  # magi-notifyd owns org.freedesktop.Notifications, so notify-send needs no
-  # shell-specific client.
+  # The Quickshell pill owns org.freedesktop.Notifications, so notify-send
+  # needs no shell-specific client.
   (def argv @["notify-send" "-a" "magi"
               "-u" (if (= type :error) "critical" "normal")])
   (when category (array/push argv "-c" category))
   (when icon (array/push argv "-i" icon))
   (array/push argv message)
   (when details (array/push argv details))
-  (os/execute (array/slice argv) :p)
+  (os/spawn (array/slice argv) :pd)
   (if sound (play-sound sound)))
 
 (defn yank [text &named type once]

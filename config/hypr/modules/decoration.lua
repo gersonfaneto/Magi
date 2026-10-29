@@ -1,8 +1,12 @@
 -- config/hypr/modules/decoration.lua
 --
--- Window-decoration knobs. Edit this file directly; the
--- checkout's ~/.config/hypr/local/modules shadows it if present. Border colours
--- stay with the palette pipeline (hyprland-colors), never here.
+-- Window-decoration knobs. The Quickshell Look surface
+-- (config/quickshell/pill/Look.qml) rewrites this file through
+-- ~/.config/hypr/local/modules and reloads Hyprland. Border colours stay with
+-- the palette pipeline (hyprland-colors), never here.
+--
+-- Double-quoted strings on purpose: the surface's JS setters only strip double
+-- quotes, so single-quoting `layout` would break its read back.
 
 hl.config({
   general = {
@@ -25,7 +29,7 @@ hl.config({
       enabled = true,
       range = 12,
       render_power = 3,
-      color = "0xaa000000",
+      color = "0xaa14110f",
     },
     blur = {
       enabled = true,

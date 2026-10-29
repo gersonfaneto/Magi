@@ -48,7 +48,6 @@ in {
     modules.wm.theme.files.tmux = {
       input_path = "${config.magi.configDir}/theme/tmux.template.conf";
       output_path = "${config.home.configDir}/tmux/theme.conf";
-      scope = "terminal";
       # Tmux doesn't reread its config, so update the default server. Multiple
       # servers (or no running server) are left alone.
       post_hook = "tmux source-file ${config.home.configDir}/tmux/theme.conf 2>/dev/null || true";

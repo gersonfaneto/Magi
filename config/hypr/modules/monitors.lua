@@ -1,8 +1,13 @@
 -- config/hypr/modules/monitors.lua
 --
--- Monitor layout. Edit this file directly; the
--- checkout's ~/.config/hypr/local/modules shadows it if present. The workspace
--- loops decide which output a numbered workspace starts on.
+-- Monitor layout. The Quickshell Display surface
+-- (config/quickshell/pill/Display.qml) rewrites each block's mode, position and
+-- scale through ~/.config/hypr/local/modules. The workspace loops are what it
+-- rewrites when it swaps the main monitor, and they decide which output a
+-- numbered workspace starts on.
+--
+-- Double-quoted strings on purpose: the surface's JS setters only strip double
+-- quotes.
 
 hl.monitor({
   output = "eDP-1",

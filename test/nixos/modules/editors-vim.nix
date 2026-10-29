@@ -91,8 +91,9 @@ in {
     expected = map (_: true) (lib.range 1 29);
   };
 
-  # The pipeline registers the only colorscheme, generated.lua, in nvim's site
-  # dir; there are no curated colors/ files left to drift from the mono tone.
+  # The pipeline registers generated.lua in nvim's site dir for the
+  # washi/dynamic sources; curated schemes still come from
+  # config/nvim/colors and the everforest/gruvbox-material plugins.
   testNvimRegistersGeneratedTemplate = {
     expr = let
       t = on.modules.wm.theme.files.nvim;

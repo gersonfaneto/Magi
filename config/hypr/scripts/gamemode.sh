@@ -2,13 +2,13 @@
 #
 # Game mode visual strip for Hyprland. `on` snapshots the current decoration and
 # animation values, then strips them live through hl.config eval (no reload, so no
-# flicker). `off` pushes the snapshot back the same way, and `toggle` picks one
-# from the snapshot's presence. If the snapshot is ever missing, `off` falls
-# back to a full reload.
+# flicker). `off` pushes the snapshot back the same way. The snapshot lives in a
+# file so a pill restart mid-game-mode can still restore; if it is ever missing,
+# `off` falls back to a full reload.
 #
 set -euo pipefail
 
-state="${XDG_STATE_HOME:-$HOME/.local/state}/magi"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
 snap="$state/gamemode-snapshot.json"
 mkdir -p "$state"
 
@@ -34,9 +34,6 @@ case "${1:-}" in
 				'{gaps_in:$gi, gaps_out:$go, border_size:$bs, rounding:$rd, blur:$bl, shadow:$sh, anim:$an}' >"$snap"
 		fi
 		strip
-		;;
-	toggle)
-		if [ -f "$snap" ]; then "$0" off; else "$0" on; fi
 		;;
 	off)
 		if [ -f "$snap" ]; then

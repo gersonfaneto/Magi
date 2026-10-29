@@ -1,9 +1,9 @@
 # test/nixos/modules/wm/theme.nix --- tests for modules/wm/theme.nix
 #
-# The module owns the Qt scheme, the font sets and the manifest the theme
-# renderer reads. It rides modules.wm.desktop, so every read goes through that;
-# the manifest points at live templates, which pure eval can't open, so the
-# on-disk checks read them off the snapshot DIR stands in for.
+# The module owns the Qt scheme, the font sets and the manifest the Quickshell
+# theme renderer reads. It rides modules.wm.desktop, so every read goes through
+# that; the manifest points at live templates, which pure eval can't open, so
+# the on-disk checks read them off the snapshot DIR stands in for.
 {
   evalConfig,
   presets,
@@ -14,7 +14,7 @@
 }:
 with lib; let
   desktop = modules: evalConfig ([{modules.wm.desktop = "hyprland";}] ++ modules);
-  shell = presets.hyprland;
+  shell = desktop [{modules.wm.quickshell.enable = true;}];
 
   # Every real host with a desktop, plus the template-bearing apps no host
   # happens to run right now.
@@ -47,7 +47,7 @@ in {
   in {
     expr = {
       qt = c.home.configFile ? "qt6ct/qt6ct.conf";
-      manifest = c.home.stateLink ? "magi/theme/templates.json";
+      manifest = c.home.stateLink ? "quickshell/templates.json";
     };
     expected = {
       qt = false;
@@ -55,16 +55,16 @@ in {
     };
   };
 
-  # The renderer writes colors/magi.conf, so these files are what actually puts
-  # the palette on a Qt app.
-  testQtCtSelectsThePaletteScheme = let
+  # The Quickshell renderer writes colors/quickshell.conf, so these files are
+  # what actually puts the palette on a Qt app.
+  testQtCtSelectsTheShellScheme = let
     c = shell;
   in {
     expr =
       map
       (
         v:
-          hasInfix "color_scheme_path=${c.home.configDir}/${v}ct/colors/magi.conf"
+          hasInfix "color_scheme_path=${c.home.configDir}/${v}ct/colors/quickshell.conf"
           c.home.configFile."${v}ct/${v}ct.conf".text
       )
       [
@@ -77,9 +77,10 @@ in {
     ];
   };
 
-  testQtCtIsInstalledWithTheDesktop = {
-    expr = shell.home.configFile ? "qt6ct/qt6ct.conf";
-    expected = true;
+  # Without the shell there is no renderer, so there is no scheme to select.
+  testQtCtIsAbsentWithoutTheShell = {
+    expr = presets.hyprland.home.configFile ? "qt6ct/qt6ct.conf";
+    expected = false;
   };
 
   # wallcolors.py rethemes GTK through gsettings and posts its notice through
@@ -150,40 +151,6 @@ in {
     expected = [];
   };
 
-  # Both desktop and terminal outputs render the active mono bundle now.
-  testDesktopFileScopes = let
-    c = shell;
-  in {
-    expr = map (name: c.modules.wm.theme.files.${name}.scope) ["hyprland" "hyprlock" "qt5ct" "qt6ct" "fsel"];
-    expected = ["desktop" "desktop" "desktop" "desktop" "desktop"];
-  };
-
-  testTerminalFileScopes = let
-    c = desktop [
-      {
-        modules.apps.term.foot.enable = true;
-        modules.shell.scripts.enable = true;
-        modules.shell.tmux.enable = true;
-        modules.shell.zsh.enable = true;
-        modules.editors.vim.enable = true;
-      }
-    ];
-    names = [
-      "foot"
-      "highlight"
-      "tmux"
-      "fzf"
-      "zsh-p10k"
-      "zsh-dircolors"
-      "zsh-syntax-highlighting"
-      "zsh-autosuggestions"
-      "nvim"
-    ];
-  in {
-    expr = map (name: c.modules.wm.theme.files.${name}.scope) names;
-    expected = map (_: "terminal") names;
-  };
-
   testManifestMatchesFiles = let
     c = desktop [
       {
@@ -194,7 +161,7 @@ in {
         };
       }
     ];
-    manifest = filter (f: f.name == "example") (fromJSON (readFile c.home.stateLink."magi/theme/templates.json"));
+    manifest = filter (f: f.name == "example") (fromJSON (readFile c.home.stateLink."quickshell/templates.json"));
   in {
     expr = manifest;
     expected = [
@@ -202,33 +169,7 @@ in {
         name = "example";
         input_path = "${dir}/theme/qtct.template.conf";
         output_path = "/out";
-        scope = "desktop";
         pre_hook = "true";
-        post_hook = "";
-      }
-    ];
-  };
-
-  testExplicitScope = let
-    c = desktop [
-      {
-        modules.wm.theme.files.example = {
-          input_path = "${dir}/theme/foot.template.ini";
-          output_path = "/out";
-          scope = "terminal";
-        };
-      }
-    ];
-    manifest = filter (f: f.name == "example") (fromJSON (readFile c.home.stateLink."magi/theme/templates.json"));
-  in {
-    expr = manifest;
-    expected = [
-      {
-        name = "example";
-        input_path = "${dir}/theme/foot.template.ini";
-        output_path = "/out";
-        scope = "terminal";
-        pre_hook = "";
         post_hook = "";
       }
     ];
@@ -320,7 +261,7 @@ in {
     expected = true;
   };
 
-  ## Template inputs and the mono palette.
+  ## Template inputs and the scheme registry.
 
   # The renderer fails on a missing input instead of skipping it, and it can't
   # be handed a font, so no template may ask for one -- fonts come from Nix.
@@ -335,69 +276,38 @@ in {
     };
   };
 
-  # There is one palette family with two tones. Both foot themes must exist
-  # and palette.nix has to link both bundles.
-  testMonoPalettesAreComplete = let
-    c = presets.hyprland;
-    tones = ["dark" "light"];
-  in {
-    expr = {
-      foot = map (tone: builtins.pathExists "${dir}/config/foot/themes/mono-${tone}.ini") tones;
-      links = map (tone: c.home.stateLink ? "magi/theme/palettes/mono-${tone}.json") tones;
-    };
-    expected = {
-      foot = [true true];
-      links = [true true];
-    };
-  };
-
-  testMonoWallpapersLinked = let
-    c = presets.hyprland;
-  in {
-    expr = c.home.dataLink."magi/wallpapers";
-    expected = "${c.magi.configDir}/assets/wallpapers";
-  };
-
-  testMonoCursorAndIcons = let
+  # config/theme/schemes.json is the one list; every selectable scheme needs a
+  # foot and highlight pair, and palette.nix has to link both tones.
+  testSchemeRegistryIsComplete = let
+    reg = fromJSON (readFile "${dir}/config/theme/schemes.json");
+    names =
+      filter
+      (name: !(reg.schemes.${name}.identity or false))
+      (attrNames reg.schemes);
+    missing = kind: ext: mode: name: let
+      path = "${dir}/config/${kind}/themes/${name}-${mode}.${ext}";
+    in
+      optional (!(builtins.pathExists path)) path;
     c = presets.hyprland;
   in {
     expr = {
-      icons = {
-        name = c.modules.wm.theme.icons.name;
-        light = c.modules.wm.theme.icons.lightName;
-        packages = map (p: p.pname or "") c.modules.wm.theme.icons.packages;
-      };
-      cursor = {
-        name = c.modules.wm.theme.cursor.name;
-        light = c.modules.wm.theme.cursor.lightName;
-        package = c.modules.wm.theme.cursor.package.pname or "";
-      };
-      info = {
-        inherit (c.magi.info.theme) icons cursor;
-      };
+      foot =
+        concatMap
+        (name: concatMap (mode: missing "foot" "ini" mode name) ["dark" "light"])
+        names;
+      highlight =
+        concatMap
+        (name: concatMap (mode: missing "highlight" "theme" mode name) ["dark" "light"])
+        names;
+      links =
+        concatMap
+        (name: map (mode: c.home.stateLink ? "quickshell/palettes/${name}-${mode}.json") ["dark" "light"])
+        names;
     };
     expected = {
-      icons = {
-        name = "Mono-Dark";
-        light = "Mono";
-        packages = ["magi-mono-icons"];
-      };
-      cursor = {
-        name = "phinger-cursors-dark";
-        light = "phinger-cursors-light";
-        package = "phinger-cursors";
-      };
-      info = {
-        icons = {
-          name = "Mono-Dark";
-          lightName = "Mono";
-        };
-        cursor = {
-          name = "phinger-cursors-dark";
-          lightName = "phinger-cursors-light";
-          size = 32;
-        };
-      };
+      foot = [];
+      highlight = [];
+      links = map (_: true) (concatMap (name: ["dark" "light"]) names);
     };
   };
 }

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Stub the pill's menu IPC: return the requested row, or the next test input.
+file=$7
+result=$(jq -r '.resultPath' "$file")
+
+if [ "$(jq -r '.input // false' "$file")" = "true" ]; then
+  n=$(cat "$RBW_TEST_COUNTER" 2>/dev/null || printf '0')
+  n=$((n + 1))
+  printf '%s' "$n" > "$RBW_TEST_COUNTER"
+  value=$(cat "$RBW_TEST_INPUT_DIR/$n" 2>/dev/null)
+  jq -cn --arg value "$value" '{ok:true,data:$value,label:$value}' > "$result"
+  exit 0
+fi
+
+value=$(jq -c --arg pick "$RBW_TEST_PICK" '
+  [.items[] | select((.data | type) == "object" and .data.id != null)] as $entries
+  | if ($entries | length) > 0 then
+      (if $pick == "last" then $entries[-1] else $entries[0] end)
+    elif ($pick | startswith("action:")) then
+      (([.items[] | select((.data | type) == "array" and .data[0] == ($pick | ltrimstr("action:")))] | .[0]) // .items[0])
+    else
+      [.items[] | select((.data | type) == "string")] as $fields
+      | if ($fields | length) > 0 then
+          (if $pick == "last" then $fields[-1] else $fields[0] end)
+        else
+          (if $pick == "last" then .items[-1] else .items[0] end)
+        end
+    end
+  | {ok:true,data:.data,label:.label}' "$file")
+printf '%s' "$value" > "$result"

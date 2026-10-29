@@ -44,10 +44,12 @@
 (deftest completion/theme-arg
   (test (offers? (magi "themearg" "") "theme-commands") true)
   (test (magi "themearg" "bg" "") @["WANT[backgrounds] light dark"])
-  (test (magi "themearg" "apps" "") @["WANT[app-themes] on off"])
+  (test (magi "themearg" "source" "")
+        @["WANT[modes] scheme dynamic"])
+  (test (magi "themearg" "set" "") @["WANT[schemes] -a schemes"])
   # Past the one value these subcommands take, zsh is on its own.
-  (test (magi "themearg" "bg" "dark" "") @[])
-  (test (magi "themearg" "apply" "") @[]))
+  (test (magi "themearg" "set" "nano" "") @[])
+  (test (magi "themearg" "list" "") @[]))
 
 (deftest completion/ssh-target
   # @ssh-target completes both halves of `lab fs [user@]host[:/path]`, ala _ssh

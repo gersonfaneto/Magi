@@ -6,7 +6,7 @@ alias -- -='cd -'
 alias :q=exit
 alias cl=clear
 # The trailing space lets the alias after sudo expand too; -A sends the
-# password prompt to pinentry-curses (modules/shell/gnupg.nix),
+# password prompt to the Quickshell pinentry card (modules/wm/pinentry.nix),
 # which falls back to the terminal when the shell isn't running.
 alias sudo='sudo -A '
 alias rm='rm -i'
@@ -14,7 +14,6 @@ alias mkdir='mkdir -pv'
 alias wget='wget -c'
 alias path='echo -e ${PATH//:/\\n}'
 alias ports='netstat -tulanp'
-alias now='date +"%d %b. %Y @ %I:%M %p"'
 alias mk=make
 alias gurl='curl --compressed'
 
@@ -100,4 +99,8 @@ if (( $+commands[nix] )); then
   alias nrp='nix repl "<nixpkgs>"'
   alias ns='nix search'
   alias nsp='nix search nixpkgs'
+fi
+
+if (( $+commands[opencode2] )); then
+  alias c=opencode2
 fi

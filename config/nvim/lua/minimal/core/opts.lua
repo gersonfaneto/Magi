@@ -13,7 +13,6 @@ vim.opt.helpheight = 10
 vim.opt.showmode = false
 vim.opt.mousemoveevent = true
 vim.opt.number = true
-vim.opt.relativenumber = true
 vim.opt.ruler = true
 vim.opt.pumheight = 16
 vim.opt.scrolloff = 2

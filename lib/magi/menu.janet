@@ -1,43 +1,22 @@
 # lib/magi/menu.janet
 #
-# An API for `fsel --dmenu` (config/fsel). A script hands fsel a list of rows
-# and blocks until a row is picked -- or until the menu is dismissed, so Escape
-# always returns. fsel draws on /dev/tty and writes the answer to stdout, so a
-# menu must run inside a terminal (`foot --app-id=magi-menu -e magi @menu ...`).
+# An API for the Quickshell pill's generic menu surface
+# (config/quickshell/pill/Menu.qml). It replaces the old rofi API: instead of
+# spawning rofi and reading its dmenu output, a script hands the surface a JSON
+# payload over `qs ipc` and blocks on the result file the surface writes when a
+# row is picked -- or when the menu is dismissed, so Escape always returns.
 #
 # The surface owns no data, so every menu's logic stays in the script that calls
-# this. Rows travel as `label<TAB>desc<TAB>id`; only the id comes back, so the
-# caller's :data is handed over verbatim and never round-trips through the menu.
+# this, and the payload is just rows plus a place to put the answer.
 
 (use ./lib)
 (import ./sys :as sys)
 (import spork/json :as json)
 
-(def- *delimiter* "\t")
+(var *seq* 0)
 
-(defn- shell-quote
-  ``Single-quote S for sh. Used for the file paths this module generates, which
-  never contain newlines.``
-  [s]
-  (string "'" (string/replace-all "'" "'\\''" s) "'"))
-
-(defn- run
-  ``Run the fsel COMMAND with stdin from IN and stdout into OUT. fsel paints on
-  stderr, so it stays attached to the caller's terminal; returns its exit code.``
-  [command in out]
-  (def script
-    (string/format "exec %s < %s > %s"
-                   command (shell-quote in) (shell-quote out)))
-  (os/execute ["sh" "-c" script] :p))
-
-(defn- temp [suffix]
-  (def dir (path :runtime))
-  (unless (path/directory? dir)
-    (os/mkdir dir))
-  (path :runtime (string/format "menu-%d-%s" (os/getpid) suffix)))
-
-(defn- slurp-stripped [file]
-  (string/trimr (slurp file) "\r\n"))
+(defn- result-path []
+  (path :runtime (string/format "menu-%d-%d" (os/getpid) (++ *seq*))))
 
 (defn- row
   ``Normalize ITEM into a menu row. A table is taken as-is (its :label defaults
@@ -47,82 +26,69 @@
     (merge {:label (string (or (item :label) (item :data) ""))} item)
     {:label (string item) :data item}))
 
-(defn- roundtrip
-  ``Normalize DATA the way the old pill surface did: through JSON, so tuples
-  become arrays and keyword keys survive. Callers hand :data over verbatim but
-  receive the same shapes a serialized menu returned.``
-  [data]
-  (try (json/decode (json/encode data) :keywords true)
-       ([_] data)))
+(defn- open
+  ``Show the surface with PAYLOAD (written to a file beside FILE, as lists can
+  outgrow an IPC argument) and block until the result file appears. Returns its
+  contents, or nil if the caller waited an hour (the shell is gone).``
+  [payload file]
+  (def payload-file (string file ".json"))
+  (spit payload-file payload)
+  (defer (ignore-errors (os/rm payload-file))
+    (unless (zero? (os/execute ["qs" "-c" "pill" "ipc" "call" "pill" "menuFile" payload-file] :p))
+      (abort "Could not open the menu; is the Quickshell pill running?"))
+    # 20 polls a second for an hour: the surface writes the result as soon as
+    # it closes, so the wait only ever runs this long if the shell died.
+    (var waited 0)
+    (while (and (not (os/stat file :mode)) (< waited 72000))
+      (ev/sleep 0.05)
+      (++ waited))
+    (when (os/stat file :mode)
+      (slurp file))))
 
-(defn- clean [s]
-  # fsel splits on the delimiter and on newlines, so neither may reach a cell.
-  (->> (string s)
-       (string/replace-all "\t" " ")
-       (string/replace-all "\n" " ")))
-
-(defn- encode [rows]
-  (string/join
-    (seq [i :range [0 (length rows)] :let [r (rows i)]]
-      (string (clean (r :label)) *delimiter*
-              (clean (r :desc)) *delimiter*
-              i))
-    "\n"))
-
-(defn- fsel-command [&named prompt password]
-  (def base "fsel --dmenu --delimiter \"\t\" --match-nth 1,2")
-  (if prompt
-    (string base " --prompt-only" (if password " --password" ""))
-    (string base " --with-nth 1,2 --accept-nth 3 --only-match --exit-if-empty")))
+(defn- decode [raw]
+  (def res (json/decode raw :keywords true))
+  (when (res :ok)
+    (res :data)))
 
 (defn pick
   ``Show ITEMS in the menu surface and return the picked row's :data, or nil if
   the menu was dismissed. ITEMS is a sequence of tables; each may carry a :label,
-  :desc and :data (handed back verbatim). TITLE, GLYPH, PROMPT and MESSAGE are
-  accepted for compatibility with the old pill surface and ignored: fsel draws
-  its own chrome and has nothing to put them in.``
+  :desc, :icon (an icon name or a path to an image), :glyph (a baked glyph name),
+  :data (handed back verbatim) and :accent (highlight the row). TITLE names the
+  menu, GLYPH is its kanji, PROMPT turns on the search field, and MESSAGE shows a
+  line under the header.``
   [items &named title glyph prompt message]
-  (def rows (map row (or items @[])))
-  (if (empty? rows)
-    nil
-    (let [in (temp "in")
-          out (temp "out")]
-      (defer (do (ignore-errors (os/rm in))
-                 (ignore-errors (os/rm out)))
-        (spit in (encode rows))
-        (def code (run (fsel-command) in out))
-        (def answer (if (os/stat out :mode) (slurp-stripped out) ""))
-        (def index (scan-number answer))
-        (if (and (zero? code)
-                 index
-                 (>= index 0)
-                 (< index (length rows)))
-          (roundtrip ((rows index) :data))
-          nil)))))
+  (def file (result-path))
+  (defer (ignore-errors (os/rm file))
+    (if-let [raw (open
+                   (json/encode
+                     {:title (or title "MENU")
+                      :glyph glyph
+                      :prompt prompt
+                      :message message
+                      :items (map row items)
+                      :resultPath file})
+                   file)]
+      (decode raw))))
 
 (defn read
   ``Prompt for text in the menu surface; return it, or nil if the prompt was
-  dismissed. PLACEHOLDER is ignored (fsel has no prompt text), PASSWORD masks
-  what is typed, and MULTILINE opens $EDITOR on a temporary file.``
+  dismissed. PLACEHOLDER shows while the field is empty, PASSWORD masks what is
+  typed, and MULTILINE lets Shift+Enter add a line.``
   [&named title placeholder password multiline]
-  (if multiline
-    (let [file (temp "edit")]
-      (defer (ignore-errors (os/rm file))
-        (spit file "")
-        (def editor (or (os/getenv "VISUAL") (os/getenv "EDITOR") "nvim"))
-        (if (zero? (os/execute [editor file] :p))
-          (let [text (slurp-stripped file)]
-            (if (empty? text) nil text))
-          nil)))
-    (let [in (temp "in")
-          out (temp "out")]
-      (defer (do (ignore-errors (os/rm in))
-                 (ignore-errors (os/rm out)))
-        (spit in "")
-        (def code (run (fsel-command :prompt true :password password) in out))
-        (if (zero? code)
-          (slurp-stripped out)
-          nil)))))
+  (def file (result-path))
+  (defer (ignore-errors (os/rm file))
+    (if-let [raw (open
+                   (json/encode
+                     {:title (or title "INPUT")
+                      :glyph "問"
+                      :input true
+                      :password password
+                      :multiline multiline
+                      :prompt placeholder
+                      :resultPath file})
+                   file)]
+      (decode raw))))
 
 (defn prompt
   ``Ask QUESTION with a yes and a no row; return true, false, or nil if the menu
@@ -132,14 +98,9 @@
          {:label (or no "No") :data false}]
         :title "CONFIRM" :message question))
 
-(defn launch
-  ``Run ARGV in a new session, so whatever a menu starts outlives the terminal
-  the menu closes. Use it instead of os/spawn for apps and URL handlers.``
-  [& args]
-  (os/spawn ["setsid" "-f" ;args] :pd))
-
 (defn notice
-  ``Show MESSAGE as a notification. Accepts fmt-style ARGS.``
+  ``Show MESSAGE as a notification; the pill owns org.freedesktop.Notifications.
+  Accepts fmt-style ARGS.``
   [message & args]
   (sys/notify (fmt message ;args)))
 

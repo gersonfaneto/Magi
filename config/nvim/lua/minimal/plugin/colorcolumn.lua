@@ -43,7 +43,7 @@ local opts = {
   warning = {
     alpha = 0.4,
     offset = 0,
-    colorcode = '#808080',
+    colorcode = '#FF0000',
     hlgroup = { 'Error', 'fg' },
   },
 }

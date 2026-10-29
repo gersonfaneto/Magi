@@ -1,8 +1,9 @@
 -- config/hypr/hyprland.lua
 --
 -- Dwindle-based Hyprland config, following Ricelin's module layout with the
--- Magi extras on top. The modules under modules/ are hand-edited; the stable
--- frame around them lives here.
+-- Magi extras on top. The modules under modules/ are the parts the Quickshell
+-- Settings surfaces rewrite (through ~/.config/hypr/local/modules); everything
+-- here is the stable frame around them.
 
 require('modules.env')
 require('modules.monitors')
@@ -10,6 +11,8 @@ require('modules.input')
 require('modules.decoration')
 require('modules.animations')
 require('modules.binds-default')
+require('modules.windowmenu')
+require('rishot')
 require('modules.window_rules')
 require('modules.spaces-apply')
 require('modules.autostart')

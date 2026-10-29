@@ -25,12 +25,12 @@ in {
     user.packages = [
       pkgs.rbw
       (mkLauncherEntry "Bitwarden Entry ->" {
-        description = "Search, unlock, and copy via `magi @menu rbw`";
+        description = "Search, unlock, and copy via the Quickshell pill";
         icon = "dialog-password";
         exec = "magi @menu rbw";
       })
       (mkLauncherEntry "New Bitwarden Entry ->" {
-        description = "Generate and save a login via `magi @menu rbw`";
+        description = "Generate and save a login via the Quickshell pill";
         icon = "list-add";
         exec = "magi @menu rbw --new";
       })

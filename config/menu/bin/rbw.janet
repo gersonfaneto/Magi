@@ -421,7 +421,7 @@
 (defn- handle-field [entry selection]
   (if (array? selection)
     (case (selection 0)
-      "open-url" (menu/launch "xdg-open" (selection 1))
+      "open-url" (os/spawn ["xdg-open" (selection 1)] :pd)
       "edit-password" (edit-password entry)
       "edit-notes" (edit-notes entry)
       "delete" (delete-entry entry)

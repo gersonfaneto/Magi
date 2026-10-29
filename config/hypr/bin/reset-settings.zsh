@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Reset the local Hyprland files to the checkout defaults.
+# Reset the Quickshell Settings-managed Hyprland files to the checkout defaults.
 #
 # SYNOPSIS:
 #   reset-settings

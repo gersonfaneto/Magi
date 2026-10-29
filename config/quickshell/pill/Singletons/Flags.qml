@@ -1,0 +1,151 @@
+pragma Singleton
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+/**
+ * Shared session flags persisted to a small JSON file and watched for external
+ * change, so every Quickshell daemon (pill, lock) reads and writes the same
+ * Do-Not-Disturb and Keep-Awake state live without a second notification server
+ * or idle inhibitor. Toggling in one surface updates the others on the next file
+ * event, and the state survives a daemon restart.
+ */
+Singleton {
+    id: root
+
+    property alias dnd: adapter.dnd
+    property alias keepAwake: adapter.keepAwake
+    property alias time12h: adapter.time12h
+    property alias clockSeconds: adapter.clockSeconds
+    property alias showGlyphs: adapter.showGlyphs
+    property alias paletteMode: adapter.paletteMode
+    property alias scheme: adapter.scheme
+    property alias bg: adapter.bg
+    property alias appTheme: adapter.appTheme
+    property alias wallpaperDir: adapter.wallpaperDir
+    property alias wallpaperFit: adapter.wallpaperFit
+    property alias randomScope: adapter.randomScope
+    property alias uiScale: adapter.uiScale
+    property alias reduceMotion: adapter.reduceMotion
+    property alias uiFont: adapter.uiFont
+    property alias pillOpacity: adapter.pillOpacity
+    property alias pillBlur: adapter.pillBlur
+    property alias topGap: adapter.topGap
+    property alias appGap: adapter.appGap
+    property alias recordCountdown: adapter.recordCountdown
+    property alias recordDir: adapter.recordDir
+    property alias recordFps: adapter.recordFps
+    property alias recordQuality: adapter.recordQuality
+    property alias recordCursor: adapter.recordCursor
+    property alias recordMic: adapter.recordMic
+    property alias recordDesktop: adapter.recordDesktop
+    property alias recordClearedBefore: adapter.recordClearedBefore
+    property alias idleLockMin: adapter.idleLockMin
+    property alias idleScreenOffMin: adapter.idleScreenOffMin
+    property alias idleSuspendMin: adapter.idleSuspendMin
+    property alias weatherCity: adapter.weatherCity
+    property alias musicViz: adapter.musicViz
+    property alias gameMode: adapter.gameMode
+    property alias gamePrevDnd: adapter.gamePrevDnd
+    property alias gamePrevViz: adapter.gamePrevViz
+    property alias gamePrevAwake: adapter.gamePrevAwake
+    property alias gamePrevProfile: adapter.gamePrevProfile
+    property alias nightLightMode: adapter.nightLightMode
+    property alias nightLightTemp: adapter.nightLightTemp
+    property alias nightLightOnMin: adapter.nightLightOnMin
+    property alias nightLightOffMin: adapter.nightLightOffMin
+    property alias dockEnabled: adapter.dockEnabled
+    property alias dockAutoHide: adapter.dockAutoHide
+    property alias dockMinimal: adapter.dockMinimal
+    property alias dockUiScale: adapter.dockUiScale
+    property alias dockGap: adapter.dockGap
+    property alias dockStyle: adapter.dockStyle
+    property alias cycleSlot4: adapter.cycleSlot4
+    property alias cycleSlot5: adapter.cycleSlot5
+    property alias memorySaver: adapter.memorySaver
+    property alias unloadSec: adapter.unloadSec
+    property alias lockShowWifi: adapter.lockShowWifi
+    property alias lockShowBattery: adapter.lockShowBattery
+
+    FileView {
+        id: file
+        path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/quickshell/flags.json"
+        blockLoading: true
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: reload()
+        onAdapterUpdated: writeAdapter()
+        onLoadFailed: function(error) {
+            if (error === FileViewError.FileNotFound)
+                writeAdapter();
+        }
+
+        JsonAdapter {
+            id: adapter
+            property bool dnd: false
+            property bool keepAwake: false
+            property bool time12h: false
+            property bool clockSeconds: false
+            property bool showGlyphs: true
+            property string paletteMode: "scheme"
+            property string scheme: "nano"
+            property string bg: "dark"
+            /** GTK apps follow the pill palette. Off by default so an update never restyles apps unasked; the installer turns it on for fresh boxes. */
+            property bool appTheme: false
+            /** Explicit wallpaper folder override. Empty means autodetect: the dir wallpaper.sh last resolved (quickshell-wallpaper-dir state file), then ~/Pictures/Wallpapers. Lives in user state so an in-app update never clobbers a custom folder. */
+            property string wallpaperDir: ""
+            /** awww resize mode: crop fills the screen, fit letterboxes, stretch distorts. */
+            property string wallpaperFit: "crop"
+            /** Super+B random target: "all" repaints every monitor, "cursor" only the one under the pointer. */
+            property string randomScope: "all"
+            property real uiScale: 1.0
+            property bool reduceMotion: false
+            property string uiFont: ""
+            property real pillOpacity: 1.0
+            property bool pillBlur: false
+            /** Top margin as a fraction of the shipped 8px. 0 sits the pill flush to the screen edge. */
+            property real topGap: 1.0
+            /** Pill-to-window band as a fraction of the shipped 12px. 0 tucks the windows flush under the pill. */
+            property real appGap: 1.0
+            property int recordCountdown: 5
+            property string recordDir: ""
+            property int recordFps: 60
+            property string recordQuality: "high"
+            property bool recordCursor: true
+            property bool recordMic: true
+            property bool recordDesktop: true
+            property real recordClearedBefore: 0
+            property int idleLockMin: 5
+            property int idleScreenOffMin: 6
+            property int idleSuspendMin: 0
+            property string weatherCity: ""
+            property bool musicViz: true
+            property bool gameMode: false
+            property bool gamePrevDnd: false
+            property bool gamePrevViz: true
+            property bool gamePrevAwake: false
+            property string gamePrevProfile: ""
+            property string nightLightMode: "off"
+            property int nightLightTemp: 4000
+            property int nightLightOnMin: 1260
+            property int nightLightOffMin: 450
+            /** Bottom dock (pinned + running apps). */
+            property bool dockEnabled: true
+            property bool dockAutoHide: true
+            property bool dockMinimal: false
+            property real dockUiScale: 1.0
+            property real dockGap: 1.0
+            /** "transparent" or "solid"; the dock follows the pill palette either way. */
+            property string dockStyle: "transparent"
+            /** Right-click walk stops 4 and 5; empty drops the stop. */
+            property string cycleSlot4: "emoji"
+            property string cycleSlot5: "scratch"
+            /** Drop idle surface instances after unloadSec seconds; off keeps them resident. */
+            property bool memorySaver: true
+            property int unloadSec: 120
+            property bool lockShowWifi: true
+            property bool lockShowBattery: true
+        }
+    }
+}

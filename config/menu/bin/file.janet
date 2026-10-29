@@ -31,10 +31,10 @@
   [dirs files])
 
 (defn- open-term [dir]
-  (menu/launch "magi" ".open-term" "-t" (path/basename dir) "--" "-c" dir))
+  (os/spawn ["magi" ".open-term" "-t" (path/basename dir) "--" "-c" dir] :pd))
 
 (defn- open-file [file]
-  (menu/launch "xdg-open" file))
+  (os/spawn ["xdg-open" file] :pd))
 
 (defn- browse [start]
   (var dir (path/abspath start))

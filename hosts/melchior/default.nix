@@ -35,6 +35,7 @@ with builtins; {
 
     wm = {
       desktop = "hyprland";
+      quickshell.enable = true;
       theme.fonts.mono = "Fantasque Sans Mono";
       plymouth = {
         enable = true;
