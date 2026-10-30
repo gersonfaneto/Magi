@@ -46,6 +46,7 @@ in {
       include=${config.home.configDir}/foot/themes/nano-dark.ini
       include=${config.magi.configDir}/foot/foot.ini
       include=${config.home.configDir}/foot/theme.ini
+      include=${config.home.configDir}/foot/overrides.ini
     '';
 
     modules.wm.theme.files.foot = {
