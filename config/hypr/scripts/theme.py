@@ -218,8 +218,12 @@ def complete_bundle(bundle):
         "on_background": cream,
         "on_surface": cream,
         "surface_variant": container,
+        "surface_container": container,
         "surface_container_low": low,
         "surface_container_high": high,
+        "surface_container_highest": mix(surface, cream, 0.12)
+        if tone == "dark"
+        else darken(surface, 0.08),
         "surface_container_lowest": darken(low, 0.12)
         if tone == "dark"
         else lighten(low, 0.12),

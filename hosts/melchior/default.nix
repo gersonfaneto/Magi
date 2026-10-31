@@ -30,6 +30,7 @@ with builtins; {
         "audio"
         "ssd"
         "bluetooth"
+        "fingerprint"
       ];
     };
 

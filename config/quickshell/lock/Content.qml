@@ -300,10 +300,47 @@ Item {
             NumberAnimation { target: capsuleShift; property: "x"; to: 0; duration: 50 }
         }
 
+        /**
+         * Scanner control. The scan starts on its own when the lock opens, so
+         * this is mainly a visible affordance and a tap-to-retry after a
+         * missed or rejected finger.
+         */
+        GlyphIcon {
+            id: fingerIcon
+            anchors.left: parent.left
+            anchors.leftMargin: 16 * content.s
+            anchors.verticalCenter: parent.verticalCenter
+            width: 20 * content.s
+            height: 20 * content.s
+            name: "fingerprint"
+            stroke: 1.8
+            color: {
+                if (!content.auth)
+                    return Theme.dim;
+                if (content.auth.fingerprintFailed)
+                    return Theme.error;
+                if (fingerArea.containsMouse)
+                    return Theme.cream;
+                if (content.auth.fingerprinting)
+                    return Theme.cream;
+                return Theme.dim;
+            }
+
+            MouseArea {
+                id: fingerArea
+                anchors.fill: parent
+                anchors.margins: -6 * content.s
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: if (content.auth)
+                    content.auth.rescan()
+            }
+        }
+
         TextInput {
             id: input
             anchors.fill: parent
-            anchors.leftMargin: 24 * content.s
+            anchors.leftMargin: 46 * content.s
             anchors.rightMargin: 46 * content.s
             verticalAlignment: TextInput.AlignVCenter
             horizontalAlignment: TextInput.AlignHCenter
@@ -423,6 +460,72 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: content.reveal = !content.reveal
             }
+        }
+    }
+
+    /**
+     * Scanner caption. Kept out of the capsule so it can explain the state
+     * without shoving a paragraph into the password field. It disappears as
+     * soon as a password is typed or a password error is shown.
+     */
+    Item {
+        id: fingerprintHint
+        anchors.horizontalCenter: capsule.horizontalCenter
+        anchors.bottom: capsule.top
+        anchors.bottomMargin: 18 * content.s
+        width: hintRow.width
+        height: hintRow.height
+        visible: content.isMain && content.auth !== null && !content.showError
+                 && input.text.length === 0
+                 && (content.auth.fingerprinting || content.auth.fingerprintFailed || content.auth.fingerprintUnavailable)
+
+        Row {
+            id: hintRow
+            spacing: 8 * content.s
+
+            Item {
+                width: 16 * content.s
+                height: hintText.implicitHeight
+
+                GlyphIcon {
+                    id: hintGlyph
+                    anchors.centerIn: parent
+                    width: 16 * content.s
+                    height: 16 * content.s
+                    name: "fingerprint"
+                    stroke: 1.6
+                    opacity: 1
+                    color: content.auth && (content.auth.fingerprintFailed || content.auth.fingerprintUnavailable)
+                        ? (content.auth.fingerprintFailed ? Theme.error : Theme.dim)
+                        : Theme.cream
+                }
+            }
+
+            Text {
+                id: hintText
+                text: {
+                    if (!content.auth)
+                        return "";
+                    if (content.auth.fingerprintUnavailable)
+                        return "fingerprint unavailable";
+                    if (content.auth.fingerprintFailed)
+                        return "not recognized, touch again";
+                    return "touch to unlock";
+                }
+                color: content.auth && content.auth.fingerprintFailed ? Theme.error : Theme.dim
+                font.family: Theme.font
+                font.pixelSize: 12 * content.s
+                font.letterSpacing: 0.6 * content.s
+            }
+        }
+
+        SequentialAnimation {
+            running: content.auth !== null && content.auth.fingerprinting
+                     && !content.auth.fingerprintFailed && !content.auth.fingerprintUnavailable
+            loops: Animation.Infinite
+            NumberAnimation { target: hintGlyph; property: "opacity"; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+            NumberAnimation { target: hintGlyph; property: "opacity"; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+            onStopped: hintGlyph.opacity = 1
         }
     }
 }

@@ -40,7 +40,65 @@ Item {
     property string errorText: ""
     property bool expecting: false
     property bool busy: false
+    property bool launching: false
     property date now: new Date()
+
+    /** greetd is waiting on the reader, not on a password. */
+    readonly property bool scanning: Greetd.available
+        && Greetd.state === GreetdState.Authenticating
+        && !root.expecting
+        && !root.busy
+
+    /**
+     * Start greetd's PAM transaction before anyone types. greetd's stack puts
+     * pam_fprintd before the password prompt (see
+     * modules/profiles/hardware/fingerprint.nix), so this is what gives the
+     * greeter a fingerprint window. The repeating timer also restarts the
+     * transaction after a failed attempt.
+     */
+    function startAuth(): void {
+        if (root.launching || !Greetd.available || Greetd.state !== GreetdState.Inactive || root.busy)
+            return;
+        root.errorText = "";
+        Greetd.createSession(root.userName);
+    }
+
+    /**
+     * Tap-to-scan. If a password prompt is already open, drop that transaction
+     * and let greetd start a fresh one so the reader gets another window.
+     */
+    function fingerprint(): void {
+        if (root.launching || !Greetd.available)
+            return;
+        root.errorText = "";
+        root.expecting = false;
+        pw.text = "";
+        if (Greetd.state === GreetdState.Authenticating) {
+            root.busy = true;
+            Greetd.cancelSession();
+            refinger.restart();
+            return;
+        }
+        root.busy = false;
+        root.startAuth();
+    }
+
+    Timer {
+        id: refinger
+        interval: 150
+        onTriggered: {
+            root.busy = false;
+            root.startAuth();
+        }
+    }
+
+    Timer {
+        interval: 1500
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.startAuth()
+    }
 
     function submit(): void {
         root.errorText = "";
@@ -94,6 +152,7 @@ Item {
         }
 
         function onReadyToLaunch() {
+            root.launching = true;
             Greetd.launch(root.sessionCmd, root.sessionEnv, true);
         }
 
@@ -179,7 +238,7 @@ Item {
                 id: pw
                 anchors.fill: parent
                 anchors.leftMargin: 18
-                anchors.rightMargin: 18
+                anchors.rightMargin: 46
                 verticalAlignment: TextInput.AlignVCenter
                 horizontalAlignment: TextInput.AlignHCenter
                 echoMode: TextInput.Password
@@ -201,6 +260,75 @@ Item {
                     font.family: Theme.font
                     font.pixelSize: 15
                 }
+            }
+
+            /** Tap to drop a stale password prompt and give the reader a fresh window. */
+            GlyphIcon {
+                id: fingerIcon
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                width: 20
+                height: 20
+                name: "fingerprint"
+                stroke: 1.8
+                color: root.errorText.length > 0
+                    ? Theme.error
+                    : (fingerArea.containsMouse || root.scanning ? Theme.cream : Theme.dim)
+
+                MouseArea {
+                    id: fingerArea
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.fingerprint()
+                }
+            }
+        }
+
+        Item {
+            width: parent.width
+            height: fingerHintText.implicitHeight
+            visible: root.scanning && pw.text.length === 0 && root.errorText.length === 0
+
+            Row {
+                id: fingerHint
+                anchors.centerIn: parent
+                spacing: 8
+
+                Item {
+                    width: 14
+                    height: fingerHintText.implicitHeight
+
+                    GlyphIcon {
+                        id: fingerHintIcon
+                        anchors.centerIn: parent
+                        width: 14
+                        height: 14
+                        name: "fingerprint"
+                        stroke: 1.6
+                        color: Theme.cream
+                        opacity: 1
+                    }
+                }
+
+                Text {
+                    id: fingerHintText
+                    text: "touch the sensor"
+                    color: Theme.dim
+                    font.family: Theme.font
+                    font.pixelSize: 12
+                    font.letterSpacing: 0.5
+                }
+            }
+
+            SequentialAnimation {
+                running: root.scanning
+                loops: Animation.Infinite
+                NumberAnimation { target: fingerHintIcon; property: "opacity"; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+                NumberAnimation { target: fingerHintIcon; property: "opacity"; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+                onStopped: fingerHintIcon.opacity = 1
             }
         }
 

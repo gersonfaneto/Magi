@@ -142,6 +142,7 @@ hl.bind(mod .. " + ALT + SHIFT + B", cmd("magi @menu rbw --new"))
 -- * OS and session
 
 hl.bind(mod .. " + SHIFT + R", cmd("magi reload @hypr"))
+hl.bind(mod .. " + CTRL + I", cmd("magi idle toggle"))
 hl.bind(mod .. " + Return", cmd("magi .open-term"))
 hl.bind(mod .. " + SHIFT + Return", cmd("foot || xterm"))
 hl.bind(mod .. " + Escape", function()

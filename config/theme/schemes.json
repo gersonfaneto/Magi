@@ -28,6 +28,10 @@
       "accent": 6,
       "editor": "nano"
     },
+    "paper": {
+      "accent": 6,
+      "editor": "paper"
+    },
     "sonokai": {
       "accent": 1,
       "editor": "sonokai"

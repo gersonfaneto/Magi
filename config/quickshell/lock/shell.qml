@@ -38,6 +38,7 @@ ShellRoot {
         id: collapse
         interval: 640
         onTriggered: {
+            pamAuth.stop();
             sessionLock.locked = false;
             Cava.enabled = false;
             Pw.text = "";
@@ -58,6 +59,7 @@ ShellRoot {
         root.writeLockState("1");
         sessionLock.locked = true;
         Cava.enabled = true;
+        pamAuth.begin();
         reveal.restart();
     }
 

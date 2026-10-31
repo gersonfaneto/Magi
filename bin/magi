@@ -26,6 +26,7 @@
 (import ./magi.d/battery)
 (import ./magi.d/gc)
 (import ./magi.d/hook)
+(import ./magi.d/idle)
 (import ./magi.d/info)
 (import ./magi.d/ops)
 (import ./magi.d/path)
@@ -62,6 +63,7 @@
              :hook          hook/hook
              :host          {:doc "Dispatch to hosts/$HOST/bin."
                              :exec |[(path (keyword $0) "bin") ;$&]}
+             :idle          idle/idle
              :info          info/info
              :ops           ops/ops
              :path          path/path
