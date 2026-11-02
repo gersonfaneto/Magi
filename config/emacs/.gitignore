@@ -1,0 +1,12 @@
+# Only the user-authored Emacs configuration belongs in the flake. Runtime
+# state lives under XDG data/cache/state (see early-init.el).
+
+/*
+!.gitignore
+!aliases.zsh
+!init.el
+!early-init.el
+!minimal-*/
+!modules/
+!modules/*.el
+!straight.lockfile*.el

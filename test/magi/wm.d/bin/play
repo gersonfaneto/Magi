@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+# Stand-in for sox's play, for test/magi/wm.janet. Logs its argv to
+# $MAGI_TEST_PLAY_LOG, one line per call, and plays nothing.
+print -r -- "$*" >>$MAGI_TEST_PLAY_LOG

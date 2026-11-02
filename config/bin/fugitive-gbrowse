@@ -1,0 +1,18 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+ARGS="$*"
+
+if command -v nvim >/dev/null 2>&1; then
+  VIM_COMMAND='nvim -E --headless'
+else
+  VIM_COMMAND='vim -E'
+fi
+
+if [[ -z $ARGS ]]; then
+  ${=VIM_COMMAND} +'GBrowse' +'qa!'
+else
+  ${=VIM_COMMAND} +"exe escape('GBrowse $ARGS', \"\\'\")" +'qa!'
+fi
+
+print

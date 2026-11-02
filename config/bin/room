@@ -1,0 +1,87 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Open a shell in a temporary directory, cleaning it up on exit.
+
+KEEP=0
+PURGE=0
+
+purge_rooms() {
+  local count=0
+  local dir cwd
+  for dir in /tmp/*.room(N); do
+    [[ -d "$dir" ]] || continue
+    local in_use=0
+    for cwd in /proc/*/cwd(N); do
+      [[ -L "$cwd" ]] || continue
+      if [[ "$(readlink "$cwd")" == "$dir" ]]; then
+        in_use=1
+        break
+      fi
+    done
+    if (( in_use == 0 )); then
+      rm -rf -- "$dir"
+      (( count += 1 ))
+    fi
+  done
+  echo "Purged $count unused room(s)"
+}
+
+usage() {
+  cat >&2 <<EOF
+Usage: room [-k|--keep] [-p|--purge]
+
+Open a shell in a temporary directory.
+
+Options:
+  -k, --keep    Don't clean up the temp directory on exit
+  -p, --purge   Remove all unused *.room folders under /tmp
+  -h, --help    Show this help message
+EOF
+  exit "${1:-0}"
+}
+
+while (( $# > 0 )); do
+  case "$1" in
+    -k | --keep)
+      KEEP=1
+      shift
+      ;;
+    -p | --purge)
+      PURGE=1
+      shift
+      ;;
+    -h | --help) usage 0 ;;
+    *) usage 1 ;;
+  esac
+done
+
+if (( PURGE == 1 )); then
+  purge_rooms
+  exit 0
+fi
+
+DIR=/tmp/$$.room
+
+mkdir -p "$DIR"
+
+if (( KEEP == 0 )); then
+  trap 'rm -rf -- "${DIR:-?}"' EXIT INT TERM HUP
+fi
+
+cd "$DIR" || exit 0
+
+copy_to_clipboard() {
+  if [[ "${XDG_SESSION_TYPE:-}" == wayland ]] && command -v wl-copy &>/dev/null; then
+    echo -n "$1" | wl-copy
+  elif command -v xclip &>/dev/null; then
+    echo -n "$1" | xclip -selection clipboard
+  else
+    return 1
+  fi
+}
+
+if ! copy_to_clipboard "$DIR"; then
+  echo "$DIR"
+fi
+
+(${SHELL:-/bin/sh})

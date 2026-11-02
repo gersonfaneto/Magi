@@ -1,0 +1,3 @@
+#!/bin/sh
+[ -n "$RBW_TEST_CLIP_LOG" ] && printf '%s\n' "$*" >> "$RBW_TEST_CLIP_LOG"
+cat > "$RBW_TEST_COPIED"

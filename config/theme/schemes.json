@@ -1,0 +1,57 @@
+{
+  "default": {
+    "scheme": "nano",
+    "bg": "dark"
+  },
+  "schemes": {
+    "cockatoo": {
+      "editor": "cockatoo"
+    },
+    "everforest": {
+      "editor": "everforest"
+    },
+    "gruvbox-material": {
+      "editor": "gruvbox-material"
+    },
+    "macro": {
+      "editor": "macro"
+    },
+    "nano": {
+      "editor": "nano"
+    },
+    "paper": {
+      "editor": "paper"
+    },
+    "solarized": {
+      "editor": "solarized"
+    },
+    "sonokai": {
+      "editor": "sonokai"
+    },
+    "stata": {
+      "editor": "stata"
+    },
+    "catppuccin": {},
+    "catppuccin-latte": {},
+    "ethereal": {},
+    "flexoki-light": {},
+    "gruvbox": {},
+    "hackerman": {},
+    "jade-horse": {},
+    "kanagawa": {},
+    "last-horizon": {},
+    "lumon": {},
+    "lupine": {},
+    "matte-black": {},
+    "miasma": {},
+    "nord": {},
+    "retro-82": {},
+    "ristretto": {},
+    "rose-pine": {},
+    "solitude": {},
+    "starship": {},
+    "tokyo-night": {},
+    "vantablack": {},
+    "white": {}
+  }
+}

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for python3 so the suite can assert on a failing theme.py without
+# needing an interpreter or the real script.
+exit 3

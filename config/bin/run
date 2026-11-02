@@ -1,0 +1,43 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+build() {
+  case "$1" in
+    *.c) gcc "$1" -o "$2" ;;
+    *.cpp | *.cc | *.cxx) g++ "$1" -o "$2" ;;
+    *)
+      print -u2 "run: error: unsupported file type"
+      exit 1
+      ;;
+  esac
+}
+
+run_executable() {
+  "$1"
+}
+
+main() {
+  # shellcheck disable=SC2015
+  local src=$(realpath "$1" 2>/dev/null || readlink -f "$1")
+  local executable=$(print -r -- "$src" | sed -E 's/\.(c|cpp|cc|cxx)$/.run/')
+  if [[ $src == "$executable" ]]; then
+    print -u2 "run: error: file name cannot be the same as the run file name"
+    return 1
+  fi
+
+  if [[ ! -f $src ]]; then
+    print -u2 "run: error: source file does not exist"
+    return 1
+  fi
+
+  build "$src" "$executable"
+  if [[ ! -f $executable ]]; then
+    print -u2 "run: error: build failed"
+    return 1
+  fi
+
+  run_executable "$executable"
+  rm -f "$executable"
+}
+
+main "$1"
