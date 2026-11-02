@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deterministic stand-in for mountpoint in test/magi/lab-fs.janet.
+printf 'mountpoint %s\n' "$*" >>"${FS_TEST_LOG:?}"
+exit "${MOUNTPOINT_EXIT:-0}"

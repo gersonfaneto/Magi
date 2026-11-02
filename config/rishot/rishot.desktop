@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=rishot
+Comment=Screenshot + annotation
+Exec=rishot
+Terminal=false
+Type=Application
+Categories=Graphics;
+Icon=rishot
+NoDisplay=false

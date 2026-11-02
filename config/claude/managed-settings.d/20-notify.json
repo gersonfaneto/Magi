@@ -1,0 +1,30 @@
+{
+  "preferredNotifChannel": "terminal_bell",
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "permission_prompt|worker_permission_prompt|agent_needs_input",
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 10,
+            "command": "magi @claude notify"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 10,
+            "command": "magi @claude notify"
+          }
+        ]
+      }
+    ]
+  }
+}

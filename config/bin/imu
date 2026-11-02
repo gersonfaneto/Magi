@@ -1,0 +1,168 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Image manipulation utility: imagemagick one-liners behind short verbs.
+
+local program=${0:t}
+local NOTIFYCMD
+NOTIFYCMD=$(command -v dunstify 2>/dev/null || command -v notify-send 2>/dev/null)
+
+usage() {
+  echo "$program - image manipulation utility"
+  echo ""
+  echo "Usage: $program <operation> [files...]"
+  echo ""
+  echo "Operations:"
+  echo "  png                Convert images to PNG format."
+  echo "  jpg                Convert images to JPG format."
+  echo "  bb                 Add a black border (50px) to images."
+  echo "  wb                 Add a white border (50px) to images."
+  echo "  cb                 Add a border by cropping/drawing a rectangle."
+  echo "  bw                 Convert images to black and white."
+  echo "  tr                 Attempt to remove image background."
+  echo "  tc                 Attempt to remove background and copy to clipboard."
+  echo "  sc                 Scale images to 50%."
+  echo "  fh                 Horizontally flip images."
+  echo "  fv                 Vertically flip images."
+  echo ""
+  echo "Example:"
+  echo "  $program bb *.jpg"
+  echo "  $program tr image.png"
+  exit 0
+}
+
+# Magi is a Wayland/Hyprland desktop, where wl-clipboard stands in for xclip
+# (which the upstream script assumed).
+copy_image_to_clipboard() {
+  if [[ ${XDG_SESSION_TYPE:-} == wayland ]] && command -v wl-copy >/dev/null; then
+    wl-copy --type image/png <"$1"
+    return
+  fi
+  xclip -i -selection clipboard -t image/png "$1"
+}
+
+into_png() {
+  local IMG
+  for IMG in "$@"; do
+    mogrify -format png "$IMG" && $NOTIFYCMD "Converted $IMG to png."
+  done
+}
+
+into_jpg() {
+  local IMG
+  for IMG in "$@"; do
+    mogrify -format jpg "$IMG" && $NOTIFYCMD "Converted $IMG to jpg."
+  done
+}
+
+black_border() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -bordercolor black -border 50x50 "$IMG.border" && $NOTIFYCMD "Added black border to $IMG."
+  done
+}
+
+white_border() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -bordercolor white -border 50x50 "$IMG.border" && $NOTIFYCMD "Added white border to $IMG."
+  done
+}
+
+crop_border() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -fill black -stroke none -draw "rectangle 0,0 %[fx:w],%[fx:h*0.05] rectangle 0,0 %[fx:w*0.05],%[fx:h] rectangle %[fx:w-w*0.05],0 %[fx:w],%[fx:h] rectangle 0,%[fx:h-h*0.05] %[fx:w],%[fx:h]" "$IMG.cropborder" && $NOTIFYCMD "Cropped+bordered $IMG."
+  done
+}
+
+black_white() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -colorspace Gray "$IMG.bw" && $NOTIFYCMD "B&W'd $IMG."
+  done
+}
+
+transparency() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -alpha off -fuzz 10% -fill none -draw "alpha 0,0 floodfill" \( +clone -alpha extract -blur 0x2 -level 50x100% \) -alpha off -compose copy_opacity -composite "$IMG.trnsprnt" && $NOTIFYCMD "Removed background from $IMG."
+  done
+}
+
+transparencyrecopy() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -alpha off -fuzz 10% -fill none -draw "alpha 0,0 floodfill" \( +clone -alpha extract -blur 0x2 -level 50x100% \) -alpha off -compose copy_opacity -composite "$IMG.trnsprnt"
+    copy_image_to_clipboard "$IMG.trnsprnt"
+    $NOTIFYCMD -i "$IMG.trnsprnt" "$IMG background removed and recopied "
+  done
+}
+
+scale() {
+  local IMG
+  for IMG in "$@"; do
+    mogrify "$IMG" -scale 50% "$IMG".scale && $NOTIFYCMD "Scaled $IMG to 50%."
+  done
+}
+
+horizontal_flip() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -flop "$IMG".flip && $NOTIFYCMD "Horizontally flipped $IMG."
+  done
+}
+
+vertical_flip() {
+  local IMG
+  for IMG in "$@"; do
+    magick "$IMG" -flip "$IMG".vflip && $NOTIFYCMD "Vertically flipped $IMG."
+  done
+}
+
+case $1 in
+  png)
+    shift
+    into_png "$@"
+    ;;
+  jpg)
+    shift
+    into_jpg "$@"
+    ;;
+  bb)
+    shift
+    black_border "$@"
+    ;;
+  wb)
+    shift
+    white_border "$@"
+    ;;
+  cb)
+    shift
+    crop_border "$@"
+    ;;
+  bw)
+    shift
+    black_white "$@"
+    ;;
+  tr)
+    shift
+    transparency "$@"
+    ;;
+  tc)
+    shift
+    transparencyrecopy "$@"
+    ;;
+  sc)
+    shift
+    scale "$@"
+    ;;
+  fh)
+    shift
+    horizontal_flip "$@"
+    ;;
+  fv)
+    shift
+    vertical_flip "$@"
+    ;;
+  *) usage ;;
+esac

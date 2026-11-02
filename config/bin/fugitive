@@ -1,0 +1,11 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+VIM_COMMAND=$(command -v nvim 2>/dev/null || command -v vim || exit)
+ARGS="$*"
+
+if [[ -z $ARGS ]]; then
+  ${=VIM_COMMAND} +'Git' +'silent! only'
+else
+  ${=VIM_COMMAND} +"exe escape('Git -p $ARGS', \"\\'\")" +'silent! only'
+fi

@@ -1,0 +1,40 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Check (or kill) whatever process is listening on a TCP port.
+
+# set -x # WARN: Only for debugging...
+set -euo pipefail
+
+local script_name=${0:t}
+
+usage() {
+  printf "Usage: %s [OPTIONS] PORT\n" "$script_name"
+  printf "Options:\n"
+  printf "  -k, --kill         Send a kill signal to PID on PORT\n"
+  printf "  -c, --check        Checks the PID running on PORT\n"
+  printf "  -h, --help         Show this help message\n"
+}
+
+main() {
+  if (( $# == 0 )); then
+    usage
+    return 1
+  fi
+
+  case "$1" in
+    -c | --check)
+      PID=$(lsof -i -P -n | grep LISTEN | grep "$2" | awk '{print $2}')
+      [[ -n "$PID" ]] && ps "$PID" || return 0
+      ;;
+    -k | --kill)
+      wtf --check "$2" | xargs kill -9
+      ;;
+    -h | --help)
+      usage
+      return 0
+      ;;
+    *) ;;
+  esac
+}
+
+main "$@"

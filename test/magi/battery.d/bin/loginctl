@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+# Log the lock request instead of locking a session.
+print -r -- "loginctl $*" >>${MAGI_TEST_LOG:?}
+exit 0

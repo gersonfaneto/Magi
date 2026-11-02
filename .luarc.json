@@ -1,0 +1,15 @@
+{
+  "workspace": {
+    "useGitIgnore": false,
+    "ignoreDir": [
+      "config/nvim",
+      "*.template.lua",
+      "result"
+    ]
+  },
+  "diagnostics": {
+    "globals": [
+      "magi"
+    ]
+  }
+}

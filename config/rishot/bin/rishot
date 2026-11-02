@@ -1,0 +1,102 @@
+#!/bin/sh
+# rishot - Wayland screenshot + annotation overlay (Quickshell).
+# Launches the overlay on the current output set. Bind this command to a key
+# in your compositor config (see README). Region mode also lets you click a
+# single window to grab it.
+
+set -eu
+
+usage() {
+	cat <<'EOF'
+rishot - screenshot + annotate
+
+usage: rishot [mode] [--clipboard | --raw]
+
+modes:
+  (none), region   drag a region, or click a window to grab it (default)
+  monitor          click a monitor to grab the whole output
+
+options:
+  -c, --clipboard  skip the editor, copy the PNG to the clipboard
+  --raw            skip the editor, write the PNG to stdout
+  -h, --help       show this help
+
+--clipboard and --raw exit 1 when the capture is cancelled or fails.
+
+env:
+  RISHOT_CONFIG_DIR  override the Quickshell config dir (must hold shell.qml)
+  RISHOT_UPLOAD      override the upload endpoint (https form-post target)
+  RISHOT_SAVEDIR     override the auto-save directory
+  RISHOT_KEYBIND_FILE  write the in-app rebind here instead of autodetecting
+EOF
+}
+
+mode=region
+output=""
+for arg; do
+	case "$arg" in
+		monitor | --monitor | -m) mode=monitor ;;
+		region | --region | -r) mode=region ;;
+		--clipboard | -c) output=clipboard ;;
+		--raw) output=raw ;;
+		-h | --help) usage; exit 0 ;;
+		*) printf 'rishot: unknown argument: %s\n' "$arg" >&2; usage >&2; exit 2 ;;
+	esac
+done
+
+dir="${RISHOT_CONFIG_DIR:-}"
+if [ -z "$dir" ]; then
+	self=$(dirname "$(readlink -f "$0")")
+	# The src/ beside this launcher comes first so a checkout or a freshly pulled
+	# copy always runs its own code instead of a stale shared install; the install
+	# paths are only a fallback. A normal install resolves $self/../src to the same
+	# place, so this changes nothing there.
+	for c in \
+		"$self/../src" \
+		"${HOME:-}/.local/share/rishot/src" \
+		/usr/share/rishot/src \
+		/usr/lib/rishot/src; do
+		if [ -f "$c/shell.qml" ]; then dir="$c"; break; fi
+	done
+fi
+
+if [ -z "$dir" ] || [ ! -f "$dir/shell.qml" ]; then
+	echo "rishot: could not locate the config dir (set RISHOT_CONFIG_DIR)" >&2
+	exit 1
+fi
+
+command -v qs >/dev/null 2>&1 || {
+	echo "rishot: 'qs' (quickshell) not found in PATH" >&2
+	exit 1
+}
+
+# Single instance: a second press while the overlay is up is a no-op. The lock
+# is held on fd 9 for the lifetime of qs; clipboard daemons that qs spawns close
+# fd 9 (see shell.qml) so a backgrounded wl-copy cannot pin the lock after exit.
+# Keep the lock in a user-owned dir: XDG_RUNTIME_DIR is per-user 0700, and the
+# ~/.cache fallback avoids the world-writable /tmp symlink-follow on shared boxes.
+rundir="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+mkdir -p "$rundir" 2>/dev/null || rundir="/tmp"
+lock="$rundir/rishot.lock"
+exec 9>"$lock"
+flock -n 9 || { echo "rishot: already running" >&2; [ -z "$output" ]; exit; }
+# XDG_PICTURES_DIR is rarely exported; ask user-dirs for the localised Pictures folder.
+if [ -z "${XDG_PICTURES_DIR:-}" ] && command -v xdg-user-dir >/dev/null 2>&1; then
+	pics=$(xdg-user-dir PICTURES 2>/dev/null || true)
+	[ -n "$pics" ] && [ "$pics" != "${HOME:-}" ] && export XDG_PICTURES_DIR="$pics"
+fi
+
+if [ -z "$output" ]; then exec env RISHOT_MODE="$mode" qs -p "$dir"; fi
+
+tmp=$(mktemp -d "$rundir/rishot.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+out="$tmp/out.png"
+env RISHOT_MODE="$mode" RISHOT_OUTFILE="$out" qs -p "$dir" >&2 || true
+[ -s "$out" ] || { echo "rishot: cancelled" >&2; exit 1; }
+if [ "$output" = raw ]; then
+	cat "$out"
+	exit 0
+fi
+wl-copy --type image/png <"$out" >/dev/null 9>&- || { echo "rishot: wl-copy failed" >&2; exit 1; }
+echo "rishot: copied to clipboard" >&2
+command -v notify-send >/dev/null 2>&1 && notify-send -a rishot "Copied to clipboard" 9>&- || true

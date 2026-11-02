@@ -1,0 +1,103 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+#
+# Use fzf to open files, or print a picked directory.
+#
+# SYNOPSIS:
+#   ff [BASE] [QUERY]
+#
+# DESCRIPTION:
+#   Fuzzy-pick entries under BASE with fzf and open them: text/empty files and
+#   (multiple) directories go to $EDITOR, anything else goes to xdg-open. When
+#   the lone pick is a directory, its path is printed instead, so callers can
+#   `cd "$(ff)"` -- a script cannot change its parent shell's directory.
+#
+# ARGUMENTS:
+#   * BASE  @arg-base   Directory to search. Defaults to $PWD.
+#   * QUERY @arg-query  Initial fzf query.
+#
+# Ported from Bekaboo/dot's ff.fish.
+
+__ff_open_files_or_dir() {
+  local -a text_or_dirs others
+  local target
+
+  # A script cannot cd its parent shell, so hand the directory back instead.
+  if (( $# == 1 )) && [[ -d $1 ]]; then
+    print -r -- "$1"
+    return
+  fi
+
+  for target in "$@"; do
+    if [[ -d $target ]] || file -b "$target" | grep -qE 'text|empty'; then
+      text_or_dirs+=("$target")
+    else
+      others+=("$target")
+    fi
+  done
+
+  if (( $#others )); then
+    if command -v xdg-open >/dev/null 2>&1; then
+      for target in "${others[@]}"; do
+        xdg-open "$target" >/dev/null 2>&1
+      done
+    else
+      print -u2 "xdg-open not found, omit opening files: ${(j: :)others}"
+    fi
+  fi
+
+  if (( $#text_or_dirs )); then
+    if [[ -n $EDITOR ]] && whence -p ${${(z)EDITOR}[1]} >/dev/null 2>&1; then
+      ${=EDITOR} "${text_or_dirs[@]}"
+    else
+      print -u2 "\$EDITOR not found, omit opening files: ${(j: :)text_or_dirs}"
+    fi
+  fi
+}
+
+ff() {
+  local base=${1:-$PWD}
+  local query=$2
+  local -a targets
+
+  # If there is only one target and it is a file, open it directly
+  if (( $# == 1 )) && [[ -f $base ]]; then
+    __ff_open_files_or_dir "$base"
+    return
+  fi
+
+  if ! command -v fzf >/dev/null 2>&1; then
+    print -u2 "fzf is not executable"
+    return 1
+  fi
+
+  local tmpfile
+  tmpfile=$(mktemp) || return 1
+  trap 'rm -f "$tmpfile"' EXIT
+
+  # On some systems, e.g. Ubuntu, fd is installed as 'fdfind'
+  local fd_cmd
+  if command -v fd >/dev/null 2>&1; then
+    fd_cmd=fd
+  elif command -v fdfind >/dev/null 2>&1; then
+    fd_cmd=fdfind
+  fi
+
+  if [[ -n $fd_cmd ]]; then
+    $fd_cmd -0 -p -H -L -td -tf -tl -c=always --search-path=$base |
+      fzf --read0 --ansi --query=$query >$tmpfile
+  elif command -v find >/dev/null 2>&1; then
+    find $base -print0 -type d -o -type f -o -type l -follow |
+      fzf --read0 --ansi --query=$query >$tmpfile
+  else
+    print -u2 "fd/find is not executable"
+    return 1
+  fi
+
+  targets=("${(@f)$(<$tmpfile)}")
+  (( $#targets )) || return 0
+
+  __ff_open_files_or_dir "${targets[@]}"
+}
+
+ff "$@"

@@ -1,0 +1,30 @@
+#compdef setcolor
+#
+# Completion for setcolor (config/bin/setcolor). It takes one scheme name; with
+# no argument the default (nano) is used, so an empty first word means "leave
+# the default" and TAB is only for naming a scheme.
+#
+# The set is read from the checkout's config/foot/themes (the way _magi reads its
+# script dirs) rather than written down here, so a scheme added there completes
+# without touching this file. Those same names line up across the apps setcolor
+# touches -- foot, highlight, and nvim's colors/*.lua -- so foot's list is
+# enough.
+#
+# $fpath carries the live checkout (modules/magi.nix), so this starts completing
+# as soon as `magi reload` has dropped the compdump and a new shell starts.
+
+__setcolor_schemes() {
+  local -a schemes
+  local f
+  for f in ${DOTFILES_HOME:-/etc/magi}/config/foot/themes/*.ini(N); do
+    case ${f:t} in
+      *-dark.ini | *-light.ini) schemes+=( ${${f:t:r}%-*} ) ;;
+    esac
+  done
+  schemes=( ${(u)schemes} )
+  _describe -t colorschemes 'colorscheme' schemes
+}
+
+_arguments -s \
+  '(-h --help)'{-h,--help}'[Print usage]' \
+  '1:colorscheme:__setcolor_schemes'

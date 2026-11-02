@@ -1,0 +1,6 @@
+---@type minimal.lsp.config
+return {
+  filetypes = { 'markdown' },
+  cmd = { 'marksman' },
+  root_markers = { '.marksman.toml' },
+}

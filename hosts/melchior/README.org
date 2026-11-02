@@ -1,0 +1,31 @@
+#+TITLE: Melchior
+#+DATE:  October 6, 2026
+
+* Overview
+My ThinkPad T495 workstation, the daily driver.
+
+* Specs
+| MAKE | Lenovo ThinkPad T495                          |
+| CPU  | AMD Ryzen 5 PRO 3500U (Vega Mobile Gfx)      |
+| RAM  | 16GB (14GB usable per the kernel)            |
+| HDD  | WDC PC SN730 SDBQNTY-256G-1001 (256GB NVMe)  |
+| WIFI | Intel Wireless-AC 9260                       |
+| NIC  | Realtek RTL8111/8168 (x2)                    |
+| SD   | Realtek RTS522A card reader                  |
+| DISP | 14" 1920x1080 eDP                            |
+
+* Filesystems
+/dev/nvme0n1: WDC PC SN730 256GB (single-disk btrfs)
+#+begin_src sh
+parted /dev/nvme0n1 -- mklabel gpt
+parted /dev/nvme0n1 -- mkpart EFI fat32 1MiB 1GiB
+parted /dev/nvme0n1 -- mkpart root 1GiB 100%
+parted /dev/nvme0n1 -- set 1 boot on
+mkfs.fat -F32 /dev/nvme0n1p1
+mkfs.btrfs -L root /dev/nvme0n1p2
+mount /dev/nvme0n1p2 /mnt
+btrfs subvolume create /mnt/home
+btrfs subvolume create /mnt/nix
+#+end_src
+
+Swap lives on its own partition, /dev/nvme0n1p3.

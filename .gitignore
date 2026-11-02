@@ -1,0 +1,22 @@
+/build/
+/result
+*.zwc
+*.janet.tested
+
+# Built on demand by config/claude/scripts/ensure-reference-*.zsh
+/config/claude/data/refs/*
+!/config/claude/data/refs/README.md
+/config/claude/data/repo/
+
+# Symlinked in by nixos modules
+*.meta.lua
+
+# Local plugin install artifacts (npm), not part of the dotfiles tree.
+/config/opencode/node_modules
+
+# Hosts are a whitelist: only melchior is tracked. Scaffold new ones with
+# `nix run .#install` (see hosts/README.md) and commit them when they're
+# worth keeping.
+/hosts/*
+!/hosts/melchior/
+!/hosts/README.md
