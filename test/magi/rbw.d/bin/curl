@@ -1,0 +1,3 @@
+#!/bin/sh
+# The tests never wait for favicon warming.
+exit 1

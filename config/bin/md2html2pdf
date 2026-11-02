@@ -1,0 +1,70 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+# Magi links pandoc's data dir at $XDG_DATA_HOME/pandoc (modules/shell/pandoc.nix).
+PANDOC_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/pandoc"
+
+local script_name=${0:t}
+local script_path=$0
+
+md2html2pdf() {
+  pandoc \
+    --katex \
+    --pdf-engine="$PDF_ENGINE" \
+    -V margin-top=10 \
+    -V margin-bottom=10 \
+    -V margin-left=8 \
+    -V margin-right=8 \
+    --css "$PANDOC_DIR/css/paper.css" \
+    -f markdown-implicit_figures \
+    -t pdf \
+    "$1" \
+    -o "${1%.md}.pdf"
+}
+
+main() {
+  PDF_ENGINE="wkhtmltopdf"
+  while getopts ":lxmhp" opt; do
+    case $opt in
+      l) PDF_ENGINE="lualatex" ;;
+      x) PDF_ENGINE="xelatex" ;;
+      m) PDF_ENGINE="latexmk" ;;
+      h) PDF_ENGINE="wkhtmltopdf" ;;
+      p) PDF_ENGINE="pdflatex" ;;
+      ?)
+        print -u2 "$script_path: illegal option -- $OPTARG"
+        printf "Usage: %s [-l|-x|-m|-h|-p] files\n" "$script_name" >&2
+        return 1
+        ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  [[ $# -eq 0 ]] && {
+    print -u2 "Error: no input files"
+    return 1
+  }
+
+  local rc=0
+  local file oldpwd
+
+  for file in "$@"; do
+    oldpwd=$PWD
+
+    # Pictures in markdown cannot be fetched if we are not in the same
+    # directory
+    cd "$(dirname "$(realpath "$file")")" || return
+
+    if ! md2html2pdf "$(basename "$file")"; then
+      print -u2 "md2html2pdf: error: pandoc failed to convert '$file'"
+      cd "$oldpwd" || return
+      rc=1
+    fi
+
+    cd "$oldpwd" || return
+  done
+
+  return "$rc"
+}
+
+main "$@"

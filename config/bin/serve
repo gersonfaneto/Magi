@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Serve a directory over HTTP with the first available one-liner httpd:
+# python3, then ruby, then php.
+
+set -euo pipefail
+
+PORT=8000
+DIR=.
+
+while (( $# > 0 )); do
+  case "$1" in
+    -d | --directory)
+      DIR="$2"
+      shift 2
+      ;;
+    -p | --port)
+      PORT="$2"
+      shift 2
+      ;;
+    *)
+      PORT="$1"
+      shift
+      ;;
+  esac
+done
+
+if command -v python3 >/dev/null; then
+  exec python3 -m http.server "$PORT" --directory "$DIR"
+fi
+
+if command -v ruby >/dev/null; then
+  exec ruby -run -e httpd "$DIR" -p "$PORT"
+fi
+
+if command -v php >/dev/null; then
+  exec php -S "localhost:$PORT" -t "$DIR"
+fi
+
+echo 'O.o' >&2
+exit 1

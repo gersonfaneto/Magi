@@ -1,0 +1,10 @@
+#!/usr/bin/env zsh
+# magi.comp.dump ARG...
+#
+# Leaves the lines of `$_magi_bin help --dump ARG...` in $_magi_reply: ready-made
+# _arguments specs, generated from a script's comment header by lib/magi/docs.janet.
+
+local bin=${_magi_bin:-magi}
+(( $+commands[$bin] )) || return 1
+_magi_reply=( ${(f)"$(command $bin help --dump "$@" 2>/dev/null)"} )
+(( $#_magi_reply ))

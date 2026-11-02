@@ -1,0 +1,50 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+#
+# Open files with $EDITOR (text) or xdg-open (everything else).
+#
+# SYNOPSIS:
+#   gx FILE...
+#
+# ARGUMENTS:
+#   * FILE @arg-file  Files to open.
+
+gx() {
+  if ! command -v file >/dev/null 2>&1; then
+    print -u2 "file executable not found"
+    return 1
+  fi
+
+  local text_files other_files
+  text_files=$(mktemp) || return 1
+  other_files=$(mktemp) || return 1
+  trap 'rm -f "$text_files" "$other_files"' EXIT INT TERM HUP
+
+  # Categorize files based on their type
+  local f
+  for f in "$@"; do
+    if file -b "$f" | grep -qE 'text|empty'; then
+      print -r -- "$f" >>"$text_files"
+    else
+      print -r -- "$f" >>"$other_files"
+    fi
+  done
+
+  # Handle non-text files with xdg-open
+  if command -v xdg-open >/dev/null 2>&1; then
+    while read -r f; do
+      xdg-open "$f" >/dev/null 2>&1
+    done <"$other_files"
+  elif [[ -s $other_files ]]; then
+    print -u2 "xdg-open not found, omit opening files:"
+    cat "$other_files" >&2
+  fi
+
+  # Handle text files with $EDITOR. ${=EDITOR} restores sh-style word
+  # splitting so multi-word $EDITOR values (e.g. "nvim -f") still work.
+  if [[ -s $text_files ]]; then
+    xargs ${=EDITOR} <"$text_files"
+  fi
+}
+
+gx "$@"

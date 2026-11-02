@@ -1,0 +1,11 @@
+:set prompt "\955> "
+
+:set -XOverloadedStrings
+:set -XPartialTypeSignatures
+
+:set -fdefer-type-errors
+:set -fwarn-typed-holes
+:set -isrc
+
+:def hoogle \x -> return $ ":!hoogle --count=15 \"" ++ x ++ "\""
+:def doc \x -> return $ ":!hoogle --info \"" ++ x ++ "\""

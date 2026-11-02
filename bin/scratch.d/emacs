@@ -1,0 +1,3 @@
+#!/usr/bin/env zsh
+
+emacs --eval '(text-scale-increase 2)'

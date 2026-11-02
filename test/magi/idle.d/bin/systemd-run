@@ -1,0 +1,37 @@
+#!/usr/bin/env zsh
+# Stand-in for systemd-run, for test/magi/idle.janet. Logs its argv and records
+# the unit it would have created: NAME.timer (plus seconds until it fires, in
+# NAME.timer.left) for an --on-active run, NAME otherwise. A pre-created
+# "refuse" file makes it fail, standing in for a bad DURATION.
+print -r -- "systemd-run $*" >>${MAGI_TEST_LOG:?}
+state=${MAGI_TEST_IDLE_STATE:?}
+[[ -e $state/refuse ]] && exit 1
+
+# Systemd time spans, near enough for the handful the tests use.
+to_seconds() {
+  local span=$1
+  local n=${span%%[a-z]*}
+  local unit=${span#$n}
+  case $unit in
+    ""|s|sec|secs|second|seconds) print $n ;;
+    m|min|mins|minute|minutes)    print $(( n * 60 )) ;;
+    h|hr|hrs|hour|hours)          print $(( n * 3600 )) ;;
+    d|day|days)                   print $(( n * 86400 )) ;;
+    *)                            print 0 ;;
+  esac
+}
+
+unit= span=
+for arg in "$@"; do
+  case $arg in
+    --unit=*)      unit=${arg#--unit=} ;;
+    --on-active=*) span=${arg#--on-active=} ;;
+  esac
+done
+[[ -n $unit ]] || exit 0
+if [[ -n $span ]]; then
+  touch $state/$unit.timer
+  to_seconds $span >$state/$unit.timer.left
+else
+  touch $state/$unit
+fi

@@ -1,0 +1,9 @@
+#!/usr/bin/env zsh
+
+magi.do rsync -rltDzPJ \
+    --include=.git/ \
+    --filter=':- .gitignore' \
+    --filter=":- $XDG_CONFIG_HOME/git/ignore" \
+    --delete \
+    --delete-after \
+    "$@"
