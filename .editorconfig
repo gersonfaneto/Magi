@@ -1,0 +1,3 @@
+[{**.{sh,zsh,lua,nix,janet},bin/*,.zshrc,.zshenv}]
+indent_style = space
+indent_size = 2

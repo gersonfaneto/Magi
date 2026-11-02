@@ -1,0 +1,184 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+# Hijack fzf command for extra functionality, including adaptive height,
+# flexible preview window layout, and image preview with ueberzugpp
+
+# Get terminal size
+lines=$(command -v tput >/dev/null 2>&1 && tput lines || print -r -- "${LINES:-24}")
+cols=$(command -v tput >/dev/null 2>&1 && tput cols || print -r -- "${COLUMNS:-80}")
+
+local script_path=$0
+local script_name=${0:t}
+local script_dir=${0:h}
+
+# Normalize percentage to number
+normalize_fzf_geometry() {
+  # $1: number or percentage
+  # $2: total
+  case "$1" in
+    *%) print -r -- "$(( ${1%\%} * $2 / 100 ))" ;;
+    *) print -r -- "$1" ;;
+  esac
+}
+
+# Get fzf option value
+get_fzf_long_opt_no_space() {
+  # $1: long option name
+  # $2: default value of the option if not set
+  if ! command -v grep >/dev/null 2>&1; then
+    print -r -- "$2"
+    return 1
+  fi
+
+  local val
+  val=$(printf '%s' "$FZF_DEFAULT_OPTS" | grep -o -- "--$1=[^ ]*" | tail -n1)
+  val=${val#--"$1"=}
+  val=${val#[\"\']}
+  val=${val%[\"\']}
+
+  [[ -z $val ]] && print -r -- "$2" || print -r -- "$val"
+}
+
+# Get fzf margin or padding from $FZF_DEFAULT_OPTS environment variable fzf
+# exports $FZF_PREVIEW_{COLUMNS,LINES} so that previewer can adjust its size
+# accordingly but information about padding and margin is not provided, so we
+# have to calculate it according to $FZF_DEFAULT_OPTS, this is not ideal since
+# it won't work if user overrides the preview window settings in $@
+get_fzf_geometry_normalized() {
+  # $1: 'margin' or 'padding'
+  # $2: 'top', 'bottom', 'left', or 'right'
+  local geometry val commas total
+  geometry=$(get_fzf_long_opt_no_space "$1" 0)
+
+  case "$2" in
+    top | bottom) total=$lines ;;
+    *) total=$cols ;;
+  esac
+
+  # Count number of commas to determine format
+  commas=$(printf "%s" "$geometry" | tr -cd ',' | wc -c)
+
+  case "$commas" in
+    0) # TRBL - Single value for all sides
+      val="$geometry"
+      ;;
+    1) # TB,RL - Vertical and horizontal
+      case "$2" in
+        top | bottom) val=${geometry%%,*} ;; # First part (T/B)
+        *) val=${geometry##*,} ;;            # Second part (R/L)
+      esac
+      ;;
+    2) # T,RL,B - Top, horizontal, bottom
+      case "$2" in
+        top) val=$(print -r -- "$geometry" | cut -d',' -f1) ;;    # First part (T)
+        bottom) val=$(print -r -- "$geometry" | cut -d',' -f3) ;; # Third part (B)
+        *) val=$(print -r -- "$geometry" | cut -d',' -f2) ;;      # Second part (R/L)
+      esac
+      ;;
+    3) # T,R,B,L - Top, right, bottom, left
+      case "$2" in
+        top) val=$(print -r -- "$geometry" | cut -d',' -f1) ;;    # First part (T)
+        right) val=$(print -r -- "$geometry" | cut -d',' -f2) ;;  # Second part (R)
+        bottom) val=$(print -r -- "$geometry" | cut -d',' -f3) ;; # Third part (B)
+        left) val=$(print -r -- "$geometry" | cut -d',' -f4) ;;   # Fourth part (L)
+      esac
+      ;;
+    *)
+      print -r -- 0
+      return
+      ;;
+  esac
+
+  normalize_fzf_geometry "$val" "$total"
+}
+
+main() {
+  # Create temporary directory
+  tmp_dir=$(mktemp -d -t "${script_name}.XXXXXXXX")
+  [[ ! -d $tmp_dir ]] && print -u2 'Failed to create temp dir' && return 1
+
+  trap 'rm -rf "$tmp_dir"' EXIT INT TERM HUP
+
+  # Link files to avoid recursion
+  local file
+  for file in "$script_dir"/*(N); do
+    [[ $file == "$script_path" ]] && continue
+    ln -s "$file" "$tmp_dir"
+  done
+
+  # Update PATH
+  PATH=$(printf '%s' "$PATH" | tr ':' '\n' | sed "s|^$script_dir\$|$tmp_dir|" | tr '\n' ':' | sed 's/:$//')
+
+  # Calculate adaptive height
+  local cursor=$(cursorpos)
+  local cursor_row=${cursor%;*}
+  local fzf_height=$((lines - cursor_row - 1))
+  local min_height=$(get_fzf_long_opt_no_space min-height 10)
+
+  (( fzf_height < min_height )) && fzf_height=$min_height
+  (( fzf_height > lines )) && fzf_height=$lines
+
+  local opts="--height=$fzf_height"
+
+  # Calculate preview window layout
+  local margin_top=$(get_fzf_geometry_normalized margin top)
+  local margin_right=$(get_fzf_geometry_normalized margin right)
+  local margin_bottom=$(get_fzf_geometry_normalized margin bottom)
+  local margin_left=$(get_fzf_geometry_normalized margin left)
+  local padding_top=$(get_fzf_geometry_normalized padding top)
+  local padding_right=$(get_fzf_geometry_normalized padding right)
+  local padding_bottom=$(get_fzf_geometry_normalized padding bottom)
+  local padding_left=$(get_fzf_geometry_normalized padding left)
+
+  local inner_height=$((fzf_height - margin_top - margin_bottom - padding_top - padding_bottom))
+  local inner_width=$((cols - margin_left - margin_right - padding_left - padding_right))
+
+  (( inner_height < 1 )) && inner_height=1
+  (( inner_width < 1 )) && inner_width=1
+
+  local preview_window_orientation preview_disabled
+  if (( inner_height > 16 )) || (( inner_width > 48 )); then
+    if (( inner_width > inner_height * 3 )) && (( inner_width >= 80 )); then
+      preview_window_orientation='right'
+    else
+      preview_window_orientation='down'
+    fi
+    opts="$opts --preview-window=$preview_window_orientation"
+  else
+    opts="$opts --no-preview"
+    preview_disabled=true
+  fi
+
+  # Setup ueberzugpp if available
+  local ub_pid_file
+  if command -v ueberzugpp >/dev/null 2>&1 && [[ $FZF_PREVIEW_DISABLE_UB != true ]] && [[ $preview_disabled != true ]]; then
+    ub_pid_file="/tmp/.$(uuidgen)"
+    ueberzugpp layer --silent --no-stdin --use-escape-codes --pid-file "$ub_pid_file" >/dev/null 2>&1
+
+    # Export variables for previewer
+    UB_SOCK="/tmp/ueberzugpp-$(cat "$ub_pid_file").socket"
+    export UB_SOCK
+    export FZF_PREVIEW_ORIENTATION="$preview_window_orientation"
+    export FZF_HEIGHT="$fzf_height"
+    export FZF_MARGIN_TOP="$margin_top"
+    export FZF_MARGIN_RIGHT="$margin_right"
+    export FZF_MARGIN_BOTTOM="$margin_bottom"
+    export FZF_MARGIN_LEFT="$margin_left"
+    export FZF_PADDING_TOP="$padding_top"
+    export FZF_PADDING_RIGHT="$padding_right"
+    export FZF_PADDING_BOTTOM="$padding_bottom"
+    export FZF_PADDING_LEFT="$padding_left"
+    export FZF_TERM_LINES="$lines"
+    export FZF_TERM_COLUMNS="$cols"
+  fi
+
+  # Run fzf with our options
+  FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS $opts" fzf "$@"
+
+  # Cleanup ueberzugpp
+  { [[ -n $UB_SOCK ]] && ueberzugpp cmd -s "$UB_SOCK" -a exit } &
+  { [[ -e $ub_pid_file ]] && rm -f "$ub_pid_file" } &
+}
+
+main "$@"

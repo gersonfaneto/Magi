@@ -1,0 +1,15 @@
+#!/usr/bin/env zsh
+# magi.requires [COMMANDS...]
+#
+# Asserts that each shell executable in COMMANDS is available (in $PATH). Throws
+# an error and exits otherwise.
+
+magi.log -2 "magi.requires: $*"
+local arg ok=1
+for arg in "$@"; do
+  if ! command -v $arg >/dev/null; then
+    magi.error "Required dependency not met: $arg"
+    ok=
+  fi
+done
+[[ $ok ]] || exit 1

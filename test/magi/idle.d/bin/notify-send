@@ -1,0 +1,3 @@
+#!/usr/bin/env zsh
+# Log notifications instead of showing them.
+print -r -- "notify-send $*" >>${MAGI_TEST_LOG:?}

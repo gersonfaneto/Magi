@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+# Log the inhibitor, then stay alive until magi battery watch releases it.
+print -r -- "inhibit $*" >>${MAGI_TEST_LOG:?}
+exec sleep 60

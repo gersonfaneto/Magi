@@ -1,0 +1,10 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+# Set the background to the suggested one (see suggestbg).
+
+cur_bg=$(getbg)
+target_bg=$(suggestbg)
+
+if [[ $cur_bg != $target_bg ]]; then
+  setbg "$target_bg"
+fi

@@ -1,0 +1,29 @@
+pragma Singleton
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+/**
+ * Read-only view of the shared flags file the pill owns. This adapter carries a
+ * subset of the keys, so it must never writeAdapter or it would strip the rest
+ * of the pill's state.
+ */
+Singleton {
+    readonly property bool time12h: adapter.time12h
+    readonly property real topGap: adapter.topGap
+
+    FileView {
+        path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/quickshell/flags.json"
+        blockLoading: true
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: reload()
+
+        JsonAdapter {
+            id: adapter
+            property bool time12h: false
+            property real topGap: 1.0
+        }
+    }
+}

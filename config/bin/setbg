@@ -1,0 +1,48 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+#
+# Set the light or dark background for the whole desktop.
+#
+# SYNOPSIS:
+#   setbg [light|dark]
+#
+# DESCRIPTION:
+#   Picks the light or dark variant of the active scheme and re-renders every
+#   consumer through theme.py. With no argument, the registry's default tone is
+#   used. This switches the palette source to "scheme", the only source with a
+#   light/dark pair.
+#
+# ARGUMENTS:
+#   * BG @arg-bg  'light' or 'dark'.
+
+main() {
+  local bg='' arg
+  for arg in "$@"; do
+    case "$arg" in
+      -h | --help)
+        print "Usage: ${0:t} [light|dark]"
+        exit
+        ;;
+      light | dark)
+        bg="$arg"
+        ;;
+      *)
+        print -u2 "Usage: ${0:t} [light|dark]"
+        return 1
+        ;;
+    esac
+  done
+
+  if ! command -v magi >/dev/null 2>&1; then
+    print -u2 "Error: 'magi' not found"
+    return 1
+  fi
+
+  if [[ -n $bg ]]; then
+    magi theme bg "$bg"
+  else
+    magi theme bg
+  fi
+}
+
+main "$@"

@@ -1,0 +1,188 @@
+#!/usr/bin/env zsh
+# vim:ft=zsh:et:ts=2:sw=2:sts=2:
+
+which_exe() {
+  # $@: list of commands to test
+  local cmd
+  for cmd in "$@"; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      print -r -- "$cmd"
+      return
+    fi
+  done
+}
+
+fzf_file_previewer() {
+  # $1: file to preview
+  local abs_path tree_output info num_files num_dirs ub_x ub_y highlight_config
+
+  # In case that the file name starts with a hyphen
+  # and command does not support '--' convention
+  abs_path=$(realpath -- "$1" 2>/dev/null)
+
+  if [[ ! -r $1 ]]; then
+    printf "\033[1m%s\033[0m\n" "File not readable:" >&2
+    printf "%s\n" "$1" >&2
+    return 1
+  fi
+
+  # Clear possible ueberzugpp image preview
+  if [[ -S $UB_SOCK ]] && command -v ueberzugpp >/dev/null 2>&1; then
+    ueberzugpp cmd -s "$UB_SOCK" -a remove -i fzf-file-preview-ub 2>/dev/null
+  fi
+
+  # Preview directories
+  if [[ -d $1 ]]; then
+    if command -v tree >/dev/null 2>&1; then
+      tree_output=$(tree -N -L 4 -C -- "$1")
+      info=$(print -r -- "$tree_output" | tail -n 1)
+      printf "\033[1m%s\033[0m\n\n" "$info"
+      printf "%s\n" "$tree_output" | tail -n +2
+    else
+      if command -v find >/dev/null 2>&1 && command -v wc >/dev/null 2>&1; then
+        num_files=$(find "$abs_path" -type f | wc -l)
+        num_dirs=$(find "$abs_path" -type d | wc -l)
+        printf "\033[1m%d directories, %d files\033[0m\n" \
+          "$num_dirs" "$num_files"
+      fi
+      ls -l --color=always -- "$1"
+    fi
+    return
+  fi
+
+  # Preview regular files
+  if [[ -f $1 ]]; then
+    case "$(file -b --mime -- "$1")" in
+      image/*)
+        # ueberzugpp is up and fzf is called from wrapper
+        if [[ -S $UB_SOCK ]] && command -v ueberzugpp >/dev/null 2>&1; then
+          if (( FZF_MARGIN_RIGHT + FZF_MARGIN_LEFT + FZF_PADDING_RIGHT + FZF_PADDING_LEFT < FZF_TERM_COLUMNS )); then
+            if [[ $FZF_PREVIEW_ORIENTATION == right ]]; then
+              ub_x=$((FZF_TERM_COLUMNS - FZF_PREVIEW_COLUMNS - FZF_MARGIN_RIGHT - FZF_PADDING_RIGHT - 2))
+            else
+              ub_x=$((FZF_MARGIN_LEFT + FZF_PADDING_LEFT + 2))
+            fi
+          fi
+          if (( FZF_MARGIN_UP + FZF_MARGIN_BOTTOM + FZF_PADDING_UP + FZF_PADDING_BOTTOM < FZF_TERM_LINES )); then
+            if [[ $FZF_PREVIEW_ORIENTATION == up ]]; then
+              ub_y=$((FZF_TERM_LINES - FZF_HEIGHT + FZF_MARGIN_TOP + FZF_PADDING_TOP + 1))
+            else
+              ub_y=$((FZF_TERM_LINES - FZF_MARGIN_BOTTOM - FZF_PADDING_BOTTOM - FZF_PREVIEW_LINES - 1))
+            fi
+          fi
+          if [[ -n $ub_x ]] && [[ -n $ub_y ]]; then
+            ueberzugpp cmd \
+              -s "$UB_SOCK" \
+              -i fzf-file-preview-ub \
+              -a add \
+              -x "$ub_x" \
+              -y "$ub_y" \
+              --max-width "$FZF_PREVIEW_COLUMNS" \
+              --max-height "$((FZF_PREVIEW_LINES - 1))" \
+              -f "$1" 2>/dev/null
+            return
+          fi
+        fi
+
+        # Use ASCII image previewers if ueberzugpp not available
+        case "$(which_exe chafa imgcat tiv)" in
+          chafa)
+            if [[ -n $TMUX ]]; then
+              chafa -f symbols \
+                -s "$FZF_PREVIEW_COLUMNS"x"$FZF_PREVIEW_LINES" "$abs_path"
+            else
+              chafa -s "$FZF_PREVIEW_COLUMNS"x"$FZF_PREVIEW_LINES" "$abs_path"
+            fi
+            ;;
+          imgcat)
+            imgcat -H -w "$FZF_PREVIEW_COLUMNS" \
+              -r "$FZF_PREVIEW_LINES" "$abs_path"
+            ;;
+          tiv)
+            tiv -w "$FZF_PREVIEW_COLUMNS" -h "$FZF_PREVIEW_LINES" "$abs_path"
+            ;;
+          *)
+            print -u2 "No ascii image previewer found, install chafa, imgcat or tiv"
+            ;;
+        esac
+        ;;
+
+      application/pdf*)
+        if command -v pdftotext >/dev/null 2>&1; then
+          pdftotext -l 10 -nopgbrk -nodiag -q "$1" -
+          return
+        else
+          print -u2 'pdftotext not found'
+        fi
+        ;;
+
+      application/zip*)
+        if command -v unzip >/dev/null 2>&1; then
+          unzip -l "$abs_path"
+        elif command -v zip >/dev/null 2>&1; then
+          zip -sf -- "$1"
+        else
+          print -u2 'unzip and zip not found'
+        fi
+        ;;
+
+      application/x-tar* | application/gzip*)
+        if command -v tar >/dev/null 2>&1; then
+          tar --ignore-command-error -tf "$1" 2>/dev/null
+        else
+          print -u2 'tar not found'
+        fi
+        ;;
+
+      text/html*)
+        if command -v w3m >/dev/null 2>&1; then
+          w3m -dump "$abs_path"
+          return
+        elif command -v html2text >/dev/null 2>&1; then
+          html2text -- "$1"
+          return
+        fi
+        ;;
+
+      *)
+        # Use glow for markdown files
+        case "$1" in
+          *.md)
+            if command -v glow >/dev/null 2>&1; then
+              glow -w="$FZF_PREVIEW_COLUMNS" -- "$1"
+              return
+            fi
+            ;;
+        esac
+
+        # Use bat, highlight or cat for remaining files
+        if command -v bat >/dev/null 2>&1; then
+          if [[ -z $2 ]]; then
+            bat --paging never --style plain --color always "$1"
+          else
+            bat --paging never --style numbers --color always "$1" \
+              --highlight-line "$2"
+          fi
+          return
+        fi
+
+        if command -v highlight >/dev/null 2>&1; then
+          highlight_config="$HOME/.highlight/themes/highlight.theme"
+          if [[ ! -e $highlight_config ]]; then
+            highlight -O ansi --force -- "$1"
+          else
+            highlight -O ansi --force --config-file "$highlight_config" -- "$1"
+          fi
+          return
+        fi
+
+        if command -v cat >/dev/null 2>&1; then
+          cat "$1"
+          return
+        fi
+        ;;
+    esac
+  fi
+}
+
+fzf_file_previewer "$@"

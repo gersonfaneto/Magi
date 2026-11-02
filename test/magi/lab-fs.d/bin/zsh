@@ -1,0 +1,8 @@
+#!/bin/sh
+# Deterministic stand-in for the remote login shell in test/magi/lab-fs.janet.
+printf 'zsh %s pwd=%s mount=%s remote=%s\n' \
+  "$*" "$PWD" "$SSHFS_MOUNT" "$SSHFS_REMOTE" >>"${FS_TEST_LOG:?}"
+if [ "${ZSH_SLEEP:-0}" = 1 ]; then
+  sleep 2
+fi
+exit "${ZSH_EXIT:-0}"

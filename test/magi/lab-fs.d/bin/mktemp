@@ -1,0 +1,5 @@
+#!/bin/sh
+# Deterministic stand-in for mktemp(1) in test/magi/lab-fs.janet.
+printf 'mktemp %s\n' "$*" >>"${FS_TEST_LOG:?}"
+mkdir -p "${FS_TEST_TMP:?}/mnt"
+printf '%s\n' "${FS_TEST_TMP}/mnt"
