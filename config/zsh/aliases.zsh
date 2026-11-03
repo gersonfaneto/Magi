@@ -100,7 +100,3 @@ if (( $+commands[nix] )); then
   alias ns='nix search'
   alias nsp='nix search nixpkgs'
 fi
-
-if (( $+commands[opencode2] )); then
-  alias c=opencode2
-fi

@@ -88,6 +88,21 @@ in {
     };
   };
 
+  # Every session starts with an empty history, and the wipe has to land before
+  # the shell reads the database into its snapshot.
+  testClearsClipboardHistoryBeforeTheShell = {
+    expr = {
+      service = hasInfix "cliphist-wipe.sh" on.systemd.user.services.cliphist-wipe.serviceConfig.ExecStart;
+      type = on.systemd.user.services.cliphist-wipe.serviceConfig.Type;
+      before = elem "quickshell-pill.service" on.systemd.user.services.cliphist-wipe.before;
+    };
+    expected = {
+      service = true;
+      type = "oneshot";
+      before = true;
+    };
+  };
+
   # The shell drives hyprctl, awww and the user's apps from the session PATH,
   # not NixOS's minimal service PATH.
   testSurfacesInheritTheSessionPath = {

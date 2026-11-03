@@ -165,6 +165,23 @@ in {
       });
     }
 
+    ## A session starts with an empty clipboard history. The wipe runs before
+    ## the shell so the pill's in-memory snapshot never sees the old entries.
+    {
+      systemd.user.services.cliphist-wipe = {
+        description = "Clear clipboard history at session start";
+        wantedBy = ["graphical-session.target"];
+        partOf = ["graphical-session.target"];
+        after = ["graphical-session.target"];
+        before = ["quickshell-pill.service"];
+        enableDefaultPath = false;
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${config.magi.configDir}/hypr/scripts/cliphist-wipe.sh";
+        };
+      };
+    }
+
     ## Sound.qml probes this before offering the mic filter.
     {
       systemd.user.services.quickshell-pill.environment.RNNOISE_LADSPA_PATH = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";

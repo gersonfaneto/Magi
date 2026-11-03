@@ -80,6 +80,7 @@ with builtins; {
     };
     dev = {
       cc.enable = true;
+      go.enable = true;
       lua.enable = true;
       zig.enable = true;
       rust.enable = true;

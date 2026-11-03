@@ -1,5 +1,9 @@
 #!/usr/bin/env zsh
 
+# environment.shellAliases land in /etc/zshrc, which is sourced before this
+# file, and zsh refuses to define a function over an existing alias.
+unalias g 2>/dev/null
+
 g() { [[ $# = 0 ]] && git status --short . || git $*; }
 
 alias gcd='cd `git rev-parse --show-toplevel`'

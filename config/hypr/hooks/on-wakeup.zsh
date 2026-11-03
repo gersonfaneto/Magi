@@ -10,6 +10,10 @@
 
 magi.toast info "Waking up..."
 
+# A wl-paste watcher can survive the suspend yet never see another selection;
+# restart the pair rather than waiting for history to silently stop.
+"$HOME/.config/hypr/scripts/cliphist-watch.sh" restart
+
 # Sessions outlive suspends, so this is the closest thing to a new day. Walks
 # the sockets for the same reason on-reload.zsh does.
 for sock in ${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr/*(/N); do
