@@ -570,7 +570,9 @@ ShellRoot {
              * True while this monitor's active workspace reports a fullscreen
              * client. The pill retracts off the top edge and the layer is
              * click-through so fullscreen content owns the screen, until a
-             * surface or a peek summons it back over the content.
+             * surface or a peek summons it back over the content. A volume or
+             * brightness flash also summons it, since that feedback is worth
+             * a brief overlay; the layer stays click-through for those.
              */
             readonly property bool monFullscreen: {
                 var mons = Hyprland.monitors.values;
@@ -584,7 +586,8 @@ ShellRoot {
                 return false;
             }
             readonly property bool summoned: modal || root.peekMon === modelData.name
-            readonly property bool pillHidden: monFullscreen && !summoned
+            readonly property bool osdSummoned: monFullscreen && !summoned && pill.osdHardware
+            readonly property bool pillHidden: monFullscreen && !summoned && !osdSummoned
 
             onMonFullscreenChanged: if (monFullscreen) {
                 if (root.openMon === modelData.name) root.close();
@@ -606,7 +609,7 @@ ShellRoot {
             anchors { top: true; left: true; right: true }
             implicitHeight: tall ? modelData.height : bandH
 
-            mask: modal ? fullRegion : (pillHidden ? hiddenRegion : pillRegion)
+            mask: modal ? fullRegion : ((pillHidden || osdSummoned) ? hiddenRegion : pillRegion)
             Region { id: hiddenRegion }
             Region {
                 id: pillRegion

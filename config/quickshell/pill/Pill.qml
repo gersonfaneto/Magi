@@ -156,6 +156,14 @@ Item {
     readonly property bool osdActive: osd.flashing
 
     /**
+     * Volume and brightness are direct hardware feedback, so they are the one
+     * pair allowed to pull the pill over fullscreen content. Everything else
+     * (track changes, notifications, workspaces) stays retracted so a video or
+     * game keeps the screen to itself.
+     */
+    readonly property bool osdHardware: osd.flashing && (osd.kind === "volume" || osd.kind === "brightness")
+
+    /**
      * Quick-record overlays belong only to the focused monitor the keybind
      * targeted, so a single chooser and a single countdown toast appear. The
      * standalone chooser is suppressed while the morphing recorder surface owns the
