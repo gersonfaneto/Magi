@@ -121,7 +121,10 @@ in {
       # --modesets over it.
       systemd.services.plymouth-quit.serviceConfig.ExecStart = [
         "" # Clear ExecStart before it can be replaced
-        "${getExe' config.boot.plymouth.package "plymouth"} quit --retain-splash"
+        # The '-' mirrors nixpkgs' own unit: a switch re-runs this through
+        # sysinit-reactivation after plymouthd is long gone, and quitting then
+        # exits 1.
+        "-${getExe' config.boot.plymouth.package "plymouth"} quit --retain-splash"
       ];
 
       # Hide the console's blinking cursor from the retained frame.

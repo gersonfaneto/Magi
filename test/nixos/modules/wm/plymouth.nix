@@ -104,10 +104,14 @@ in {
     expr = {
       cleared = head exec;
       retains = any (hasSuffix "plymouth quit --retain-splash") exec;
+      # A switch reruns this after plymouthd is gone; without the prefix the
+      # resulting exit 1 fails the unit and aborts switch-to-configuration.
+      ignored = any (hasPrefix "-") exec;
     };
     expected = {
       cleared = "";
       retains = true;
+      ignored = true;
     };
   };
 
