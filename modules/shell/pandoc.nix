@@ -22,7 +22,7 @@ in {
   config = mkIf cfg.enable {
     user.packages = with pkgs; [
       pandoc
-      texlive.combined.scheme-small
+      texliveSmall
     ];
 
     # Pandoc's user data dir is $XDG_DATA_HOME/pandoc (legacy ~/.pandoc).

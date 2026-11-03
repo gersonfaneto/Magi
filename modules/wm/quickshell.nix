@@ -71,7 +71,7 @@ in {
         cliphist # clipboard history
         brightnessctl # brightness OSD
         ddcutil # external-monitor brightness (Mixer faders)
-        xorg.xrandr # XWayland primary flag when the Display surface swaps the main monitor
+        xrandr # XWayland primary flag when the Display surface swaps the main monitor
         gpu-screen-recorder # recorder surface
         ffmpeg-headless # wallpaper stills and thumbnails; no X11/GL needed
         mpvpaper # video wallpapers

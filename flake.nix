@@ -7,11 +7,11 @@
 
   inputs = {
     # Core dependecies
-    # Hyprland is the pickiest thing in this stack and I want its fixes as
-    # they land, so it gets to pin nixpkgs: the system follows the flake's
-    # rather than the other way round. That's also what keeps
-    # hyprland.cachix.org's hashes matching ours.
-    nixpkgs.follows = "hyprland/nixpkgs";
+    # nixpkgs tracks nixos-unstable on its own schedule. Hyprland builds its
+    # packages against its own pin (and pushes those to hyprland.cachix), so
+    # it has nothing to gain by dictating ours; following it only made nixpkgs
+    # lag whenever its lock sat still.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     agenix.url = "github:ryantm/agenix";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";

@@ -42,8 +42,8 @@ in {
 
   # The whole point of the branch: without nvidia_drm in stage 1 there is no
   # KMS device for Plymouth to draw on, so it falls back to the firmware
-  # framebuffer and the splash resizes mid-boot. The scripted initrd carries
-  # no modprobe.d, so modeset has to ride the command line too.
+  # framebuffer and the splash resizes mid-boot. The initrd carries no
+  # modprobe.d, so modeset has to ride the command line too.
   testNvidiaProfileLoadsDrmInStage1 = {
     expr = {
       without = nvidiaModules on;
@@ -80,28 +80,17 @@ in {
 
   # nixpkgs writes DeviceTimeout above boot.plymouth.extraConfig, so the
   # module rewrites the initrd's copy of the file (there's a grep at build
-  # time too). A scripted stage 1 ignores boot.initrd.systemd.contents, so
-  # there it can only warn.
-  testNvidiaRewritesTheInitrdConf = let
-    scripted = evalConfig [
-      {
-        modules.wm.plymouth.enable = true;
-        modules.profiles.hardware = ["gpu/nvidia"];
-        boot.initrd.systemd.enable = false;
-      }
-    ];
-  in {
+  # time too).
+  testNvidiaRewritesTheInitrdConf = {
     expr = {
       rewritten = initrdConf nvidia != etcConf nvidia;
       untouched = initrdConf on == etcConf on;
       quiet = warns nvidia;
-      loud = warns scripted;
     };
     expected = {
       rewritten = true;
       untouched = true;
       quiet = false;
-      loud = true;
     };
   };
 

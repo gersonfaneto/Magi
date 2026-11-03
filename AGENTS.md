@@ -79,8 +79,10 @@ absolute and outside the store.
 
 ## Gotchas
 
-- `nixpkgs.follows = "hyprland/nixpkgs"` — Hyprland pins nixpkgs so its
-  cachix hashes match ours; don't repin nixpkgs independently.
+- `nixpkgs` is our own `nixos-unstable` pin, bumped with
+  `nix flake update nixpkgs`. Hyprland builds against its own pin and its
+  cachix, so don't re-add `nixpkgs.follows = "hyprland/nixpkgs"`: it only
+  makes nixpkgs lag behind Hyprland's lock.
 - Never edit generated files: `config/claude/data/refs/*` (built by
   config/claude/scripts/ensure-reference-\*.zsh), and `*.meta.lua` LSP stubs
   (symlinked by modules/wm/hyprland).
