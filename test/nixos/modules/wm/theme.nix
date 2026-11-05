@@ -307,7 +307,7 @@ in {
     expected = {
       foot = [];
       highlight = [];
-      links = map (_: true) (concatMap (name: ["dark" "light"]) names);
+      links = map (_: true) (concatMap (_name: ["dark" "light"]) names);
     };
   };
 }

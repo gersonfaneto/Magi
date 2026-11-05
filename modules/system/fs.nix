@@ -3,7 +3,6 @@
   self,
   lib,
   config,
-  options,
   pkgs,
   ...
 }:
@@ -14,6 +13,7 @@ in {
   options.modules.system.fs = {
     enable = mkBoolOpt true;
     zfs.enable = mkBoolOpt (any (x: x ? fsType && x.fsType == "zfs") (attrValues config.fileSystems));
+    zfs.mail.enable = mkBoolOpt false;
     nfs.enable = mkBoolOpt false;
   };
 

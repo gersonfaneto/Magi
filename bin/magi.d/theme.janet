@@ -36,15 +36,11 @@
 
 (use magi)
 
-(defn- usage []
-  (print "Usage: magi theme {list,status,set,bg,source,apply,render,check,apps} [ARGS...]")
-  1)
-
 (defcmd theme [_ & args &opts refresh? --refresh]
   (if (empty? args)
     (usage)
-    (do
-      (def argv @["python3" (path :config "hypr" "scripts" "theme.py") ;args])
+    (let [argv @["python3" (path :config "hypr" "scripts" "theme.py") ;args]]
       # theme.py wants the option after the subcommand, not before it.
       (when refresh? (array/insert argv 3 "--refresh"))
-      (os/execute argv :p))))
+      (def code (os/execute argv :p))
+      (unless (zero? code) (exit code)))))

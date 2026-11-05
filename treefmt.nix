@@ -2,7 +2,7 @@
 #
 # `nix fmt` formats the tree; the `formatting` flake check fails when anything
 # is unformatted, so `nix flake check` enforces it in CI.
-{pkgs, ...}: {
+{...}: {
   projectRootFile = "flake.nix";
 
   # Nix (nixfmt is also what modules/editors/vim.nix installs)

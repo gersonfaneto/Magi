@@ -86,7 +86,7 @@ in rec {
   # Applies a host out of `hosts` above without evaluating it into a NixOS
   # system. Use it to assert on what a host declares, as opposed to what its
   # evaluated configuration comes out as.
-  applyHost = hostName: {
+  applyHost = _hostName: {
     path,
     config,
   }: let

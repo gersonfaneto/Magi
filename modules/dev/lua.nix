@@ -8,7 +8,6 @@
   self,
   lib,
   config,
-  options,
   pkgs,
   ...
 }:
@@ -19,7 +18,7 @@ with self.lib; let
 in {
   options.modules.dev.lua = {
     enable = mkBoolOpt false;
-    xdg.enable = mkBoolOpt devCfg.enableXDG;
+    xdg.enable = mkBoolOpt devCfg.xdg.enable;
     love2D.enable = mkBoolOpt false;
     fennel.enable = mkBoolOpt false;
   };

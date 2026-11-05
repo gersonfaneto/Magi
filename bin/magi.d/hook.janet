@@ -137,7 +137,7 @@
             (unless (do? $? ,;cmd)
               (array/push failed name)
               (echof :warn "Handler failed: %s" name))))
-        (echof :pass "Triggered %d hook(s) for: %q" (length cmds) sig)
+        (echof :check "Triggered %d hook(s) for: %q" (length cmds) sig)
         (unless (empty? failed)
           (echof :warn "%d of %d failed: %s"
                  (length failed) (length cmds) (string/join failed ", ")))))))

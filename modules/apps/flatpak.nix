@@ -6,7 +6,6 @@
   self,
   lib,
   config,
-  options,
   pkgs,
   ...
 }:
@@ -34,7 +33,14 @@ in {
 
     systemd.services.magi-flatpak-repo = {
       wantedBy = ["multi-user.target"];
+      after = ["network.target"];
       path = [config.services.flatpak.package];
+      # A one-shot: without these it drops to inactive the moment it returns,
+      # and a boot without network leaves a failed unit behind.
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
       script = ''
         flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
       '';

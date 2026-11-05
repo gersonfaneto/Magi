@@ -5,7 +5,6 @@
   self,
   lib,
   config,
-  options,
   ...
 }:
 with lib;

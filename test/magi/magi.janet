@@ -61,6 +61,19 @@
   # forwards without translation.
   (test (status "sig.zsh") 143))
 
+# Asking for help is a success; forgetting the subcommand is not. Both used to
+# print the same "Subcommand required." line and exit 1, which made
+# `magi help | less` look like a failure.
+(deftest magi/help-exit-status
+  (def magi-bin (path/abspath (path/join dir "../../bin/magi")))
+  (def devnull (file/open "/dev/null" :w))
+  (defn- status [& args]
+    (os/execute [magi-bin ;args] :p {:out devnull :err devnull}))
+  (test (status "help") 0)
+  (test (status "-h") 0)
+  (test (status "--help") 0)
+  (test (status) 1))
+
 (deftest magi/nested-rules
   # A :rules fn is how a ruleset refuses to exist somewhere (magi ops, off a
   # workstation), and its file is how it has a header without a :file key.

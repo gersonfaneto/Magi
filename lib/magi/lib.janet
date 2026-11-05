@@ -191,9 +191,19 @@
   [dir]
   (map |(path/join dir $0) (os/dir dir)))
 
-(defn path/abbrev "Replace /home/$USER to ~ in PATH."
+(defn path/abbrev
+  "Replace a leading $HOME in PATH with ~."
   [path]
-  (string/replace (os/getenv "HOME") "~" path))
+  # Not `string/replace`: it rewrites every occurrence, a nil HOME (system
+  # units, `env -i`) used to make formatting an error message raise, and a
+  # sibling like /home/foobar must not abbreviate as ~bar.
+  (def home (os/getenv "HOME"))
+  (def prefix (if (and home (not (empty? home))) (string home "/")))
+  (cond
+    (and prefix (string/has-prefix? prefix path))
+    (string "~" (slice path (length home)))
+    (and home (= path home)) "~"
+    path))
 
 (defn path/executable?
   "Return true if PATH exists and is executable."
@@ -280,9 +290,9 @@
   "Find executable NAME in PATHS (defaults to $PATH)."
   [name &opt paths]
   (if (path/abspath? name)
-    (if (path/exists? name) name)
+    (if (and (path/file? name) (path/executable? name)) name)
     (some |(let [p (path/join $0 name)]
-             (if (os/stat p :mode) p))
+             (if (and (path/file? p) (path/executable? p)) p))
           (or paths (exec-path)))))
 
 (defn- wm []
@@ -330,6 +340,14 @@
 (defn debug-level []
   (or (dyn :debug) (scan-number (or (os/getenv "MAGIDEBUG") "")) -1))
 
+(defn log-tag
+  ``The file a log line came from, as its last two path components, for the
+  LOG[...] tag. :current-file is unset when a script is compiled directly
+  (janet bin/magi.d/foo.janet), hence the fallback.``
+  [&opt file]
+  (def parts (path/parts (or file "?")))
+  (path/no-ext (path/join ;(slice parts (max 0 (- (length parts) 2))))))
+
 (defmacro log
   "Print MESSAGE to stderr, but only at debug LEVEL (1 by default) or above."
   [& args]
@@ -340,8 +358,7 @@
   ~(when (>= (,debug-level) ,level)
      (with-dyns [*out* stderr]
        (echof :debug (string "LOG[%s]: " ,message)
-              ,(path/no-ext
-                (path/join ;(slice (path/parts (dyn :current-file)) -3 -1)))
+              ,(log-tag (dyn :current-file))
               ,;args))))
 
 (defn opts

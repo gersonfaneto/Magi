@@ -2,8 +2,6 @@
 {
   self,
   lib,
-  options,
-  config,
   ...
 }:
 with lib;

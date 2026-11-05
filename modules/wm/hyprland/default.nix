@@ -208,6 +208,10 @@ in {
 
     ## For CLIs
     {
+      # gotools ships a `play` too, and wins the name collision in the system
+      # profile; sys.janet reads this to play sounds from the right one.
+      magi.info.audio.player = "${pkgs.sox}/bin/play";
+
       environment.systemPackages = with pkgs; [
         wlr-randr # for monitors that hyprctl can't handle
         wf-recorder # for screencasting

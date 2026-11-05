@@ -66,13 +66,20 @@
                           :unless (string/has-suffix? ".disabled" file)]
                       (path/no-ext file ;sound-exts)))))
 
+(defn- player []
+  ``The sound player to spawn. gotools ships a `play` of its own, which wins the
+  name collision in the system profile and is not a sound player at all, so the
+  desktop module publishes the real one through magi.info. Bare `play` is the
+  fallback for systems that never set it.``
+  (or (ignore-errors (flake/info :audio :player)) "play"))
+
 (defn play-sound
   ``Play NAME from my sound theme; nil if there's no such sound, 0 if the theme
   disables it. Returns play's exit code under WAIT, the detached process
   otherwise.``
   [name &named volume wait]
   (when-let [file (find-sound name)]
-    (def argv ["play" "-q" ;(opts "-v" volume) file])
+    (def argv [(player) "-q" ;(opts "-v" volume) file])
     (cond (string/has-suffix? ".disabled" file) 0
           wait (os/execute argv :p)
           (os/spawn argv :pd))))

@@ -49,7 +49,6 @@
   lib,
   config,
   pkgs,
-  modulesPath,
   ...
 }:
 with lib;

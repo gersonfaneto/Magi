@@ -2,9 +2,7 @@
 {
   self,
   lib,
-  options,
   config,
-  pkgs,
   ...
 }:
 with lib;

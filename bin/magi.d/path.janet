@@ -38,10 +38,10 @@
 (defn- path-1 [&opt area & args]
   (try (cond (not= area "xdg")
              (path (keyword (or area :home)) ;args)
-             (not (get args 1))
+             (not (get args 0))
              (error "Argument required")
-             (path/xdg (keyword (string/ascii-lower (in args 1)))
-                       ;(slice args 2)))
+             (path/xdg (keyword (string/ascii-lower (in args 0)))
+                       ;(slice args 1)))
        ([err] (abort "%s" err))))
 
 (defcmd path [_ area & args

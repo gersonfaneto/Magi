@@ -67,7 +67,7 @@
             (not (path/symlink? path))
             (echof :err "Skipping %s (not a nix-store symlink)" path)
             (let [spath (swap-file path)]
-              (echof :pass "Swapping %s" path)
+              (echof :check "Swapping %s" path)
               (and (do? $ mv ,;force ,path ,spath)
                    (do? $ cp ,;force ,spath ,path)
                    (do? $ chmod u+rw ,path)
@@ -86,7 +86,7 @@
       (log 2 "Trying to unswap %s" path)
       (if (not (swapped? path))
         (echof :warn "File not swapped: %s" path)
-        (do (echof :pass "Unswapping %s" path)
+        (do (echof :check "Unswapping %s" path)
           (when (do? $ mv ,;force ,(swap-file path) ,path)
             (array/push removed path)))))
     (if (or (dryrun?)

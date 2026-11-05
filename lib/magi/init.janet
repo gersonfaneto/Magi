@@ -287,7 +287,15 @@
 
             (if-let [cmd (dispatcher-for rules ;(slice args (if (= op :call) 0 1)))]
               (cmd (if help? :help op))
-              (menu-abort (dyn :script) rules))))))))
+              # An explicit request for help is a success; a missing subcommand
+              # is not, and menu-abort says so before listing the commands.
+              (if (or help? (= op :help))
+                (do
+                  (if-let [file (dyn :script)] (help [file]))
+                  (echo "\nCOMMANDS:")
+                  (echo (format-commands rules))
+                  (exit 0))
+                (menu-abort (dyn :script) rules)))))))))
 
 (defmacro dispatch [rules & args]
   ~(,dispatch-1 ,(dyn :current-file) [,;rules] ;args))

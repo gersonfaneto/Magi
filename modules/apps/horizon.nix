@@ -14,7 +14,6 @@
   self,
   lib,
   config,
-  options,
   pkgs,
   ...
 }:
@@ -50,7 +49,9 @@ with self.lib; let
     genericName = "Game launcher";
     comment = "Install, prepare and play Horizon, Minecraft: Java Edition rewritten in Rust";
     exec = "horizon-launcher";
-    icon = "horizon";
+    # The release ships no icon, so point at the themed generic game icon
+    # rather than a "horizon" name nothing installs.
+    icon = "applications-games";
     categories = ["Game"];
     startupWMClass = "horizon-launcher";
   };

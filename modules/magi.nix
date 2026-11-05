@@ -5,7 +5,6 @@
 {
   self,
   lib,
-  options,
   config,
   pkgs,
   ...

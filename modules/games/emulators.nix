@@ -6,7 +6,6 @@
   self,
   lib,
   config,
-  options,
   pkgs,
   ...
 }:
@@ -162,7 +161,7 @@ with self.lib; let
   emulatorsOf = cmd:
     map head (filter isList (split "%EMULATOR_([A-Z0-9-]+)%" cmd));
 
-  systems = mapAttrs (name: s: s // {command = commandOf s;}) cfg.systems;
+  systems = mapAttrs (_name: s: s // {command = commandOf s;}) cfg.systems;
   cores = unique (map (s: s.core) (filter (s: s.command == null) (attrValues cfg.systems)));
   used = unique (filter (e: e != "RETROARCH") (concatMap (s: emulatorsOf s.command) (attrValues systems)));
   # Known ones only, so an unknown one is the assertion's to report.

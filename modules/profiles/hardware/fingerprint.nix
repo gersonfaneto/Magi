@@ -70,7 +70,7 @@ in
           su.rules.auth.fprintd.settings.timeout = 10;
           polkit-1.rules.auth.fprintd.settings.timeout = 10;
         }
-        // genAttrs passwordOnly (name: {
+        // genAttrs passwordOnly (_name: {
           fprintAuth = false;
         });
     }
