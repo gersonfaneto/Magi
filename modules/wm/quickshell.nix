@@ -42,6 +42,19 @@ with self.lib; let
       ln -s $out/bin/quickshell $out/bin/qs
     '';
 
+  # Quickshell's network service binds NetworkManager once at startup and gives
+  # up for the life of the process if the bus name is not owned yet. The user
+  # manager can start these units before NetworkManager.service, so wait for the
+  # name; the timeout keeps the shell usable where NM isn't running.
+  waitNetworkManager = pkgs.writeShellScript "wait-networkmanager" ''
+    tries=0
+    until ${getExe' pkgs.systemd "busctl"} --system --no-pager status org.freedesktop.NetworkManager >/dev/null 2>&1; do
+      tries=$((tries + 1))
+      [ "$tries" -ge 100 ] && break
+      ${getExe' pkgs.coreutils "sleep"} 0.1
+    done
+  '';
+
   # hypridle/hyprsunset read their config from ~/.config/hypr, but the Idle/Lock
   # and Night Light surfaces own those files. Seed the initial copy from the
   # checkout when missing so the daemons can start before the surfaces are opened.
@@ -158,6 +171,7 @@ in {
         # inherit the session's PATH instead of NixOS's minimal default.
         enableDefaultPath = false;
         serviceConfig = {
+          ExecStartPre = [waitNetworkManager];
           ExecStart = "${getExe' qs "qs"} -c ${surface}";
           Restart = "always";
           RestartSec = 1;

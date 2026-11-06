@@ -103,6 +103,16 @@ in {
     };
   };
 
+  # Quickshell binds NetworkManager once at startup, but the user manager can
+  # launch the surfaces before NM owns its bus name; both wait for it first.
+  testSurfacesWaitForNetworkManager = {
+    expr = mapAttrs (_: s: any (hasInfix "wait-networkmanager") s.serviceConfig.ExecStartPre) surfaces;
+    expected = {
+      "quickshell-pill" = true;
+      "quickshell-lock" = true;
+    };
+  };
+
   # The shell drives hyprctl, awww and the user's apps from the session PATH,
   # not NixOS's minimal service PATH.
   testSurfacesInheritTheSessionPath = {
