@@ -18,7 +18,7 @@ in {
   config = mkIf cfg.enable (mkMerge [
     {
       environment.systemPackages = with pkgs; [
-        glances
+        bottom
         bandwhich # network utilization monitor
         hwinfo
         iftop

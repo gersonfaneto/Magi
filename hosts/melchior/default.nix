@@ -78,7 +78,6 @@ with builtins; {
       browsers.default = "chromium";
       browsers.chromium.enable = true;
       browsers.firefox.enable = true;
-      browsers.qutebrowser.enable = true;
 
       media.graphics.enable = true;
       media.music.enable = true;
@@ -125,6 +124,9 @@ with builtins; {
     modules.wm.theme.fonts.extraPackages = with pkgs; [
       fantasque-sans-mono
       nerd-fonts.fantasque-sans-mono
+
+      roboto-mono
+      nerd-fonts.roboto-mono
 
       departure-mono
       nerd-fonts.departure-mono
