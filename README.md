@@ -79,6 +79,23 @@ nix fmt
 Commit `flake.lock` on its own, then `magi sync switch`. If it goes wrong,
 `git checkout -- flake.lock` and rebuild, or `magi sync rollback`.
 
+If the bump changes Nix itself (a new `nixpkgs` or `nixos-rebuild-ng` pin), the
+first sync can wait forever before activating: the new Nix wants to migrate the
+store database, which needs the exclusive `big-lock`, while `nix-daemon`
+workers hold it shared for as long as their clients (nixd, for one) stay
+connected. The unit uses `KillMode=process`, so stopping it leaves those
+workers running. Release the store first, then sync:
+
+```sh
+sudo systemctl stop nix-daemon.socket
+sudo pkill -x nix-daemon        # workers too, not just the main process
+magi sync switch
+sudo systemctl start nix-daemon.socket
+```
+
+The sync only needs root and the local store, so it does not care that the
+daemon is down; other `nix` commands fail until it is back.
+
 `magi pull` reuses Nix's cached flake refs (about an hour). For the freshest
 commits, refresh explicitly:
 
