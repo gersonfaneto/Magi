@@ -62,6 +62,7 @@
         (echof :warn "Left %s alone; it and magi.dir will keep disagreeing" link)
         (break))
       (do? $? sudo rm -rf ,link))
+    (echof :g "> Pointing %s at %s..." link home)
     (unless (do? $? sudo ln -sfn ,home ,link)
       (echof :warn "Couldn't point %s at %s" link (path/abbrev home)))))
 
@@ -72,7 +73,9 @@
   (if (or (nil? id) (empty? id)) nil id))
 
 (defn- links-replay [id]
-  ($? journalctl -q -a -o cat ,(string "_SYSTEMD_INVOCATION_ID=" id)))
+  # --no-pager: without it journalctl hands the log to $PAGER when stdout is a
+  # terminal, and the rebuild waits on a pager nobody asked for.
+  ($? journalctl --no-pager -q -a -o cat ,(string "_SYSTEMD_INVOCATION_ID=" id)))
 
 (defn- links []
   (def ok? (do? $? sudo systemctl start ,*links-unit*))
@@ -131,9 +134,14 @@
          --no-update-lock-file
          ,(path :home))
     (let [host (or host (flake :host))]
+      # Say what's happening before the first thing that can stop and wait:
+      # sudo's PAM stack (fingerprint, then password). Silence here reads as a
+      # freeze, since nothing else prints until nixos-rebuild's re-exec ends.
+      (echof :g "> Getting root for %s..." host)
       (unless (do? $? sudo --validate)
         # Prompt for sudo password sooner than later
         (abort "Never got root; stopping before the long part"))
+      (echof :g "> Rebuilding %s..." host)
       (def mine? (and (not (dryrun?)) (= host (flake :host))))
       (def before (if mine? (links-run)))
       (def ok? (do? $? sudo nixos-rebuild

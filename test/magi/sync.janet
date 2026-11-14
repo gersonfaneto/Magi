@@ -49,7 +49,7 @@
      @["sudo systemctl start magi-home-links.service"
        "systemctl start magi-home-links.service"
        "systemctl show -p InvocationID --value magi-home-links.service"
-       "journalctl -q -a -o cat _SYSTEMD_INVOCATION_ID=0123456789abcdef0123456789abcdef"]])
+       "journalctl --no-pager -q -a -o cat _SYSTEMD_INVOCATION_ID=0123456789abcdef0123456789abcdef"]])
   # A failed unit still gets replayed -- that's where the reason is -- and
   # fails the command.
   (def [status out calls] (links 1))
