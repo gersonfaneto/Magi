@@ -86,7 +86,12 @@
 (use-package curry-mode
   :straight (:type git :host github :repo "tmcgilchrist/curry-mode")
   :mode
-  "\\.hs\\'")
+  "\\.hs\\'"
+  :hook
+  (curry-base-mode-hook . prettify-symbols-mode)
+  (curry-base-mode-hook . curry-repl-minor-mode)
+  :config
+  (setq curry-prettify-words nil))
 
 ;; --- OCaml Mode ---
 (use-package tuareg

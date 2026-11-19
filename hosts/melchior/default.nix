@@ -122,7 +122,8 @@ with builtins; {
   config = {pkgs, ...}: {
     modules.wm.theme.fonts.extraPackages = with pkgs; [
       (iosevka.override {
-        set = "Iosevka Minimal";
+        set = "Minimal";
+
         privateBuildPlan =
           builtins.toFile "private-build-plans.toml"
           /*
