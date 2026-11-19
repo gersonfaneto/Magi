@@ -37,7 +37,7 @@ with builtins; {
     wm = {
       desktop = "hyprland";
       quickshell.enable = true;
-      theme.fonts.mono = "Fantasque Sans Mono";
+      theme.fonts.mono = "Iosevka Minimal";
       plymouth = {
         enable = true;
         seamless = true;
@@ -121,14 +121,52 @@ with builtins; {
   ## Local config
   config = {pkgs, ...}: {
     modules.wm.theme.fonts.extraPackages = with pkgs; [
-      fantasque-sans-mono
-      nerd-fonts.fantasque-sans-mono
+      (iosevka.override {
+        set = "Iosevka Minimal";
+        privateBuildPlan =
+          builtins.toFile "private-build-plans.toml"
+          /*
+          toml
+          */
+          ''
+            [buildPlans.IosevkaMinimal]
+            family = "Iosevka Minimal"
+            spacing = "normal"
+            serifs = "sans"
+            noCvSs = false
+            exportGlyphNames = false
 
-      roboto-mono
-      nerd-fonts.roboto-mono
+            [buildPlans.IosevkaMinimal.variants]
+            inherits = "ss01"
 
-      departure-mono
-      nerd-fonts.departure-mono
+            [buildPlans.IosevkaMinimal.widths.normal]
+            shape = 560
+            menu = 5
+            css = "normal"
+
+            [buildPlans.IosevkaMinimal.weights.regular]
+            shape = 400
+            menu = 400
+            css = 400
+
+            [buildPlans.IosevkaMinimal.weights.bold]
+            shape = 700
+            menu = 700
+            css = 700
+
+            [buildPlans.IosevkaMinimal.slopes.upright]
+            angle = 0
+            shape = "upright"
+            menu = "upright"
+            css = "normal"
+
+            [buildPlans.IosevkaMinimal.slopes.italic]
+            angle = 9.4
+            shape = "italic"
+            menu = "italic"
+            css = "italic"
+          '';
+      })
     ];
 
     console.keyMap = "br-abnt2";

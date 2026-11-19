@@ -56,17 +56,12 @@ local select_all = function(opts)
   end)
 end
 
-vim.keymap.set(
-  'n',
-  '<M-a>',
-  function()
-    select_all()
-  end,
-  {
-    noremap = true,
-    desc = 'Place cursor at all occurances of the word under the cursor',
-  }
-)
+vim.keymap.set('n', '<M-a>', function()
+  select_all()
+end, {
+  noremap = true,
+  desc = 'Place cursor at all occurances of the word under the cursor',
+})
 
 vim.keymap.set('x', '<M-a>', function()
   select_all({ visual_mode = true })
@@ -136,22 +131,17 @@ end, {
   desc = 'Reset the search pattern, place cursor and advance to the next occurrence of the word under the cursor',
 })
 
-vim.keymap.set(
-  'x',
-  '<M-C-n>',
-  function()
-    search({
-      mapping = '<M-C-n>',
-      forward_search = true,
-      visual_mode = true,
-      force = true,
-    })
-  end,
-  {
-    noremap = true,
-    desc = 'Reset the search pattern, place cursor and advance to the next occurrence of selection',
-  }
-)
+vim.keymap.set('x', '<M-C-n>', function()
+  search({
+    mapping = '<M-C-n>',
+    forward_search = true,
+    visual_mode = true,
+    force = true,
+  })
+end, {
+  noremap = true,
+  desc = 'Reset the search pattern, place cursor and advance to the next occurrence of selection',
+})
 
 vim.keymap.set('n', '<M-C-S-n>', function()
   search({
