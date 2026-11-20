@@ -141,10 +141,15 @@ local function add_cursor_and_move(motion, reset)
   local count = vim.v.count1
   for _ = 1, count do
     local pos = vim.api.nvim_win_get_cursor(0)
-    add_cursor(pos[1] - 1, pos[2])
     if not pcall(vim.cmd, 'normal! ' .. motion) then
       break
     end
+    local new_pos = vim.api.nvim_win_get_cursor(0)
+    if vim.deep_equal(pos, new_pos) then
+      break
+    end
+    -- Only place a cursor if the motion actually moved somewhere new
+    add_cursor(pos[1] - 1, pos[2])
   end
 end
 
@@ -158,10 +163,14 @@ local function select_all()
   escape_visual()
   -- `zq{search}` places a cursor at every match; restore the primary cursor
   -- afterwards because the search motion moves it. Follow mode would cascade
-  -- the search per-cursor, so turn it off for the replay.
+  -- the search per-cursor, so turn it off for the replay. Force 'wrapscan' so
+  -- matches before the primary cursor are not skipped.
   local follow = vim.bo.follow
+  local wrapscan = vim.o.wrapscan
   vim.bo.follow = false
+  vim.o.wrapscan = true
   pcall(vim.cmd, 'silent! normal! zqn')
+  vim.o.wrapscan = wrapscan
   vim.bo.follow = follow
   vim.api.nvim_win_set_cursor(0, pos)
 end
