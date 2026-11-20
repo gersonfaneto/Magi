@@ -30,7 +30,7 @@ let
     dontFixup = true;
 
     postPatch = ''
-      cp ${../assets/fonts/iosevka-minimal/package-lock.json} package-lock.json
+      cp ${./package-lock.json} package-lock.json
       substituteInPlace package.json \
         --replace-fail '"verda": "^1.0.0-0"' '"verda": "^1.0.0-3"'
     '';
