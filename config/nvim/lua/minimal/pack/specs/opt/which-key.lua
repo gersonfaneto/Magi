@@ -19,7 +19,7 @@ return {
       if vim.v.vim_did_enter then
         schedule_load()
       else
-        load.on_events('UIEnter', 'which-key', scheduled_load)
+        load.on_events('UIEnter', 'which-key', schedule_load)
       end
     end,
     postload = function()
