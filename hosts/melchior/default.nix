@@ -5,7 +5,8 @@
   ...
 }:
 with lib;
-with builtins; {
+with builtins;
+{
   system = "x86_64-linux";
 
   imports = [
@@ -21,7 +22,7 @@ with builtins; {
     profiles = {
       role = "workstation";
       user = "gerson";
-      networks = ["br"];
+      networks = [ "br" ];
       hardware = [
         "cpu/amd"
         "gpu/amd"
@@ -119,55 +120,9 @@ with builtins; {
   };
 
   ## Local config
-  config = {pkgs, ...}: {
-    modules.wm.theme.fonts.extraPackages = with pkgs; [
-      (iosevka.override {
-        set = "Minimal";
-
-        privateBuildPlan =
-          builtins.toFile "private-build-plans.toml"
-          /*
-          toml
-          */
-          ''
-            [buildPlans.IosevkaMinimal]
-            family = "Iosevka Minimal"
-            spacing = "normal"
-            serifs = "sans"
-            noCvSs = false
-            exportGlyphNames = false
-
-            [buildPlans.IosevkaMinimal.variants]
-            inherits = "ss01"
-
-            [buildPlans.IosevkaMinimal.widths.normal]
-            shape = 560
-            menu = 5
-            css = "normal"
-
-            [buildPlans.IosevkaMinimal.weights.regular]
-            shape = 400
-            menu = 400
-            css = 400
-
-            [buildPlans.IosevkaMinimal.weights.bold]
-            shape = 700
-            menu = 700
-            css = 700
-
-            [buildPlans.IosevkaMinimal.slopes.upright]
-            angle = 0
-            shape = "upright"
-            menu = "upright"
-            css = "normal"
-
-            [buildPlans.IosevkaMinimal.slopes.italic]
-            angle = 9.4
-            shape = "italic"
-            menu = "italic"
-            css = "italic"
-          '';
-      })
+  config = { pkgs, ... }: {
+    modules.wm.theme.fonts.extraPackages = [
+      self.packages.iosevka-minimal
     ];
 
     console.keyMap = "br-abnt2";
@@ -182,13 +137,13 @@ with builtins; {
   };
 
   ## Hardware config
-  hardware = {...}: {
+  hardware = { ... }: {
     boot.initrd.availableKernelModules = [
       "nvme"
       "ehci_pci"
       "rtsx_pci_sdmmc"
     ];
-    boot.kernelModules = ["kvm-amd"];
+    boot.kernelModules = [ "kvm-amd" ];
 
     # Hibernation writes the session image to the swap partition. Without this
     # the kernel has no resume device to read it back from.
